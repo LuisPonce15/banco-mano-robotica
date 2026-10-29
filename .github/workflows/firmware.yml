@@ -2,9 +2,9 @@ name: Firmware
 
 on:
   push:
-    paths: ["firmware/**", ".github/workflows/firmware.yml"]
+    paths: ["firmware/**", "fsr/firmware/**", ".github/workflows/firmware.yml"]
   pull_request:
-    paths: ["firmware/**"]
+    paths: ["firmware/**", "fsr/firmware/**"]
   workflow_dispatch:
 
 jobs:
@@ -22,8 +22,9 @@ jobs:
             sketches: |
               - firmware/banco_prueba
               - firmware/banco_fase1
-          # El paquete 2.x solo se prueba con banco_prueba: las librerías
-          # actuales de banco_fase1 (ESP32Async, FastAccelStepper) piden el 3.x.
+              - fsr/firmware/fsr_ensayo
+          # El paquete 2.x solo se prueba con banco_prueba: banco_fase1 y
+          # fsr_ensayo usan librerías actuales que piden el 3.x.
           - core: "2.0.17"
             platforms: |
               - name: esp32:esp32

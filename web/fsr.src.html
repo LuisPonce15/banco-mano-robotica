@@ -1,0 +1,1388 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Banco de caracterización del FSR402 dentro de silicona: prensa con NEMA 17, dos celdas de carga con HX711 y ESP32. Simulación, toma de datos por USB, análisis, conexiones y código.">
+<title>Banco FSR</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&family=Barlow:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: hoja de ensayo de laboratorio — franja de título con lecturas en vivo, pestañas, y en «Ensayo» la prensa + gráficas a la izquierda y el panel de mando a la derecha.
+   Acento magenta: el mismo del brazo del punzón impreso. */
+:root{
+  --paper:#f1f0f4; --sheet:#ffffff; --ink:#1c1a24; --ink-2:#5a5668; --ink-3:#8a8697; --rule:#d9d6e0; --grid:#efedf3;
+  --accent:#b0275f; --accent-bg:#fbe9f0; --teal:#0e7f86; --teal-bg:#e3f4f4; --violet:#6a4fc2;
+  --danger:#c42f24; --danger-bg:#fdeeec; --warn:#a66300; --warn-bg:#fff4e2; --ok:#1f7a45; --ok-bg:#e6f4ec;
+  --frame:#9aa0a8; --metal:#c3c8cf; --silicone:#cfe3ea; --silicone-ed:#7fa9b8; --motor:#2d3038; --pink:#b0275f;
+  --w3:#7b4fc2; --wgnd:#1c1a24; --w12:#d0312d; --wsig:#0d8a78; --wmot:#6b7686; --wusb:#2a67d4;
+  --display:"Barlow Condensed","Arial Narrow",sans-serif; --body:"Barlow",system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+  --tk-com:#6b7686;--tk-str:#1f7a45;--tk-kw:#a1338f;--tk-num:#b35c00;--tk-pp:#1d5fb8;--tk-fn:#0d6a8a;--tk-ty:#7b4fc2;--tk-key:#1d5fb8;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --paper:#111015; --sheet:#1a1820; --ink:#ebe8f0; --ink-2:#a7a2b4; --ink-3:#787386; --rule:#312e3a; --grid:#211f28;
+  --accent:#ff6fa3; --accent-bg:#35192a; --teal:#4cc7cc; --teal-bg:#132a2b; --violet:#a891f0;
+  --danger:#ff6d60; --danger-bg:#2a1b1a; --warn:#f0a845; --warn-bg:#2a2214; --ok:#5cc98a; --ok-bg:#15261d;
+  --frame:#6d737c; --metal:#8e949c; --silicone:#2f4a54; --silicone-ed:#6fb2c6; --motor:#0b0c10; --pink:#e0457f;
+  --w3:#b28cf0; --wgnd:#d6d2de; --w12:#ff6b5e; --wsig:#3fc5b0; --wmot:#8e9aab; --wusb:#6ea4ff;
+  --tk-com:#7f8b9b;--tk-str:#7fd49a;--tk-kw:#e58fd8;--tk-num:#f0a845;--tk-pp:#79aaff;--tk-fn:#5fd0e6;--tk-ty:#b892f2;--tk-key:#79aaff;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#111015; --sheet:#1a1820; --ink:#ebe8f0; --ink-2:#a7a2b4; --ink-3:#787386; --rule:#312e3a; --grid:#211f28;
+  --accent:#ff6fa3; --accent-bg:#35192a; --teal:#4cc7cc; --teal-bg:#132a2b; --violet:#a891f0;
+  --danger:#ff6d60; --danger-bg:#2a1b1a; --warn:#f0a845; --warn-bg:#2a2214; --ok:#5cc98a; --ok-bg:#15261d;
+  --frame:#6d737c; --metal:#8e949c; --silicone:#2f4a54; --silicone-ed:#6fb2c6; --motor:#0b0c10; --pink:#e0457f;
+  --w3:#b28cf0; --wgnd:#d6d2de; --w12:#ff6b5e; --wsig:#3fc5b0; --wmot:#8e9aab; --wusb:#6ea4ff;
+  --tk-com:#7f8b9b;--tk-str:#7fd49a;--tk-kw:#e58fd8;--tk-num:#f0a845;--tk-pp:#79aaff;--tk-fn:#5fd0e6;--tk-ty:#b892f2;--tk-key:#79aaff;
+  color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.55;padding-block:16px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1,h2,h3{font-family:var(--display);font-weight:600;letter-spacing:.01em;margin:0;line-height:1.15;text-wrap:balance}
+h1{font-size:1.75rem}h2{font-size:1.35rem}h3{font-size:1.08rem}
+p{margin:0;max-width:75ch}
+code,.mono{font-family:var(--mono);font-size:.86em}
+a{color:var(--accent)}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.shell{max-width:1500px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;background:var(--sheet);border:1.5px solid var(--ink);border-radius:6px;padding:12px 16px}
+.top .ttl{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1 1 260px}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:flex;flex-direction:column;padding:6px 12px;border:1px solid var(--rule);border-radius:4px;min-width:118px;background:var(--sheet)}
+.chip b{font-family:var(--mono);font-weight:500;font-size:15px;font-variant-numeric:tabular-nums}
+.chip .eyebrow{font-size:10px}
+.chip.ok{border-color:var(--ok);background:var(--ok-bg)}.chip.warn{border-color:var(--warn);background:var(--warn-bg)}.chip.bad{border-color:var(--danger);background:var(--danger-bg)}.chip.acc{border-color:var(--accent);background:var(--accent-bg)}
+.tabs{display:flex;gap:4px;flex-wrap:wrap;border-bottom:1.5px solid var(--ink)}
+.tab{background:transparent;border:1px solid transparent;border-bottom:0;border-radius:6px 6px 0 0;padding:8px 16px;cursor:pointer;font-family:var(--display);font-size:1.05rem;font-weight:500;color:var(--ink-2);margin-bottom:-1.5px}
+.tab[aria-selected="true"]{background:var(--sheet);border-color:var(--ink);border-bottom:1.5px solid var(--sheet);color:var(--ink);font-weight:600}
+.panel{display:flex;flex-direction:column;gap:12px;min-width:0}
+.card{background:var(--sheet);border:1px solid var(--rule);border-radius:6px;padding:16px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.card-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:6px 14px}
+.muted{color:var(--ink-2)}.small{font-size:13px}
+.row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.btn{border:1px solid var(--ink);background:var(--sheet);border-radius:4px;padding:5px 10px;cursor:pointer;font-size:13.5px;text-decoration:none;color:inherit;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.btn:hover{background:var(--paper)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.on,.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--sheet)}
+.btn.sm{padding:3px 8px;font-size:12.5px}
+.btn.warnb{border-color:var(--danger);color:var(--danger)}
+.stop{width:100%;border:2px solid var(--danger);background:var(--danger);color:#fff;border-radius:6px;padding:9px;font-family:var(--display);font-size:1.2rem;font-weight:600;letter-spacing:.04em;cursor:pointer}
+.stop:hover{filter:brightness(1.08)}
+.seg{display:inline-flex;border:1px solid var(--ink);border-radius:4px;overflow:hidden}
+.seg button{border:0;background:var(--sheet);padding:5px 10px;cursor:pointer;font-size:13px;border-left:1px solid var(--rule)}
+.seg button:first-child{border-left:0}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--sheet)}
+.badge{font-family:var(--mono);font-size:11.5px;padding:2px 8px;border-radius:3px;border:1px solid var(--rule);white-space:nowrap}
+.badge.live{color:var(--ok);border-color:var(--ok);background:var(--ok-bg)}.badge.sim{color:var(--accent);border-color:var(--accent);background:var(--accent-bg)}
+.badge.off{color:var(--ink-2)}.badge.rec{color:#fff;border-color:var(--danger);background:var(--danger)}.badge.frozen{color:var(--teal);border-color:var(--teal);background:var(--teal-bg)}
+.note{border-left:3px solid var(--warn);background:var(--warn-bg);padding:8px 10px;font-size:13.5px}
+.note.bad{border-left-color:var(--danger);background:var(--danger-bg)}.note.ok{border-left-color:var(--ok);background:var(--ok-bg)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 18px);background:var(--ink);color:var(--sheet);padding:8px 14px;border-radius:4px;font-size:14px;z-index:20;max-width:calc(100vw - 32px)}
+.tbl{overflow-x:auto;border:1px solid var(--rule);border-radius:4px}
+table{border-collapse:collapse;width:100%;font-size:13.5px;font-variant-numeric:tabular-nums}
+th{font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2);font-weight:500;text-align:left;padding:7px 9px;background:var(--paper);border-bottom:1px solid var(--rule);white-space:nowrap}
+td{padding:6px 9px;border-bottom:1px solid var(--rule);vertical-align:top}
+tr:last-child td{border-bottom:0}
+td.m{font-family:var(--mono);font-size:12.5px;white-space:nowrap}
+pre{margin:0;background:var(--paper);border:1px solid var(--rule);border-radius:4px;padding:12px;overflow-x:auto;font-family:var(--mono);font-size:12.5px;line-height:1.5}
+.cchip{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:middle;border:1px solid var(--rule)}
+
+/* ensayo */
+.ens{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:14px;align-items:start}
+@media (max-width:1060px){.ens{grid-template-columns:minmax(0,1fr)}}
+.main{display:flex;flex-direction:column;gap:12px;min-width:0}
+.press{position:relative;border:1px solid var(--rule);border-radius:4px;overflow:hidden;background-color:var(--sheet);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:20px 20px}
+.press canvas{display:block;width:100%;height:360px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px}
+.stat{border:1px solid var(--rule);border-radius:4px;padding:6px 10px;font-size:12px;color:var(--ink-2)}
+.stat b{display:block;font-family:var(--mono);font-weight:500;font-size:15px;color:var(--ink);font-variant-numeric:tabular-nums}
+.charts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media (max-width:820px){.charts{grid-template-columns:1fr}}
+.chart{background:var(--sheet);border:1px solid var(--rule);border-radius:6px;padding:12px 12px 8px;display:flex;flex-direction:column;gap:6px;min-width:0;position:relative}
+.chart canvas{width:100%;height:210px;display:block;cursor:crosshair}
+.chart .lg{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12.5px;color:var(--ink-2)}
+.chart .lg span{display:inline-flex;align-items:center;gap:6px}
+.chart .lg i{width:14px;height:3px;border-radius:2px;display:inline-block}
+.chart .lg b{font-family:var(--mono);font-weight:500;color:var(--ink);font-variant-numeric:tabular-nums}
+.ctip{position:absolute;pointer-events:none;background:var(--sheet);border:1px solid var(--ink);border-radius:4px;padding:5px 8px;font-size:12px;font-family:var(--mono);z-index:3;white-space:nowrap}
+.side{background:var(--sheet);border:1.5px solid var(--ink);border-radius:6px;padding:14px;display:flex;flex-direction:column;gap:14px;position:sticky;top:calc(env(safe-area-inset-top,0px) + 12px);max-height:calc(100vh - 24px);overflow:auto}
+@media (max-width:1060px){.side{position:static;max-height:none}}
+.grp{display:flex;flex-direction:column;gap:8px;padding-top:12px;border-top:1px solid var(--rule)}
+.grp:first-child{border-top:0;padding-top:0}
+.grp h3{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.f2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 8px}
+.pf{display:flex;flex-direction:column;gap:3px;font-size:12.5px;min-width:0}
+.pf label,.pf>span{color:var(--ink-2)}
+.pf input,.pf select,.inp{border:1px solid var(--rule);border-radius:4px;padding:4px 8px;background:var(--paper);font-family:var(--mono);font-size:13px;width:100%;min-width:0}
+.jog{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px}
+.jog .btn{padding:4px 0;font-family:var(--mono);font-size:12px}
+.check{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--ink-2)}
+.read{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.read div{border:1px solid var(--rule);border-radius:4px;padding:5px 8px;font-size:11.5px;color:var(--ink-2)}
+.read b{display:block;font-family:var(--mono);font-weight:500;font-size:13.5px;color:var(--ink);font-variant-numeric:tabular-nums}
+.log{height:200px;overflow:auto;background:#121118;color:#d8d5e0;border-radius:4px;padding:8px 10px;font-family:var(--mono);font-size:12px;line-height:1.5;white-space:pre-wrap;word-break:break-word;margin:0;border:1px solid var(--rule)}
+.log .tx{color:#ff8fb8}.log .sys{color:#f0a845}.log .er{color:#ff6d60}.log .dt{color:#717d8d}
+.tin{display:flex;gap:6px}.tin input{flex:1;min-width:0}
+
+/* análisis */
+.an{display:grid;grid-template-columns:300px minmax(0,1fr);gap:14px;align-items:start}
+@media (max-width:900px){.an{grid-template-columns:1fr}}
+.dslist{display:flex;flex-direction:column;gap:6px}
+.ds{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:8px;align-items:center;border:1px solid var(--rule);border-radius:4px;padding:6px 8px;font-size:13px}
+.ds b{font-weight:500;overflow-wrap:anywhere}
+.ds .mono{color:var(--ink-3);font-size:11px}
+.ds button{border:0;background:none;color:var(--ink-3);cursor:pointer;font-size:16px;line-height:1}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px}
+.kpi{border:1px solid var(--rule);border-radius:4px;padding:8px 10px;font-size:12px;color:var(--ink-2);display:flex;flex-direction:column;gap:2px}
+.kpi b{font-family:var(--mono);font-weight:500;font-size:15px;color:var(--ink);font-variant-numeric:tabular-nums}
+.big canvas{height:360px}
+
+/* esquema */
+.schem{position:relative;overflow-x:auto;border:1px solid var(--rule);border-radius:4px;background-color:var(--sheet);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:20px 20px}
+.schem svg{display:block;width:100%;min-width:920px;height:auto}
+.schem text{font-family:var(--mono);font-size:11px;fill:var(--ink)}
+.schem .t2{fill:var(--ink-2)}.schem .tt{font-family:var(--display);font-size:15px;font-weight:600}
+.schem .live{font-size:11px;font-weight:500;fill:var(--accent);paint-order:stroke;stroke:var(--sheet);stroke-width:3px}
+.box{fill:var(--sheet);stroke:var(--ink);stroke-width:1.3}
+.w{fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.hit{fill:none;stroke:transparent;stroke-width:12;cursor:pointer}
+.c3{stroke:var(--w3)}.cg{stroke:var(--wgnd)}.c12{stroke:var(--w12)}.cs{stroke:var(--wsig)}.cu{stroke:var(--wusb);stroke-width:4}
+.cred{stroke:#d0312d}.cblk{stroke:var(--wgnd)}.cwht{stroke:var(--ink-3)}.cgrn{stroke:#2f9a3f}.cblu{stroke:#2a67d4}.cyel{stroke:#c9a000}
+.schem.sel .wire:not(.on){opacity:.15}
+.wire.on .w{stroke-width:3.6}
+.dot{fill:var(--ink)}
+.detail{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:14px}
+@media (max-width:760px){.detail{grid-template-columns:1fr}}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:13.5px;margin:0}
+.kv dt{color:var(--ink-2)}.kv dd{margin:0;font-family:var(--mono);font-size:12.5px}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;color:var(--ink-2)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:22px;height:0;border-top:3px solid currentColor;display:inline-block}
+
+/* documentos y modelo */
+.doc{display:flex;flex-direction:column;gap:10px;font-size:14.5px}
+.doc>*{flex-shrink:0}
+.doc h1{font-size:1.5rem}.doc h2{font-size:1.25rem;margin-top:8px;padding-bottom:4px;border-bottom:1px solid var(--rule)}.doc h3{font-size:1.08rem}
+.doc ul,.doc ol{margin:0;padding-left:1.4em;display:flex;flex-direction:column;gap:4px}
+.doc li.task{list-style:none;margin-left:-1.2em}
+.doc blockquote{margin:0;border-left:3px solid var(--warn);background:var(--warn-bg);padding:8px 12px}
+.doc code{background:var(--paper);border:1px solid var(--rule);border-radius:3px;padding:0 4px}
+.doc pre code{border:0;padding:0;background:transparent}
+.md-img{max-width:100%;max-height:520px;border-radius:6px;border:1px solid var(--rule);align-self:flex-start}
+.badge-img{height:20px;vertical-align:middle}
+.photos{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.photos figure{margin:0;display:flex;flex-direction:column;gap:6px}
+.photos img{width:100%;max-width:100%;height:320px;object-fit:cover;border-radius:6px;border:1px solid var(--rule)}
+.photos figcaption{font-size:13px;color:var(--ink-2)}
+.params{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px 16px}
+fieldset.pg{border:1px solid var(--rule);border-radius:6px;padding:10px 12px 12px;margin:0;display:flex;flex-direction:column;gap:8px;min-width:0}
+fieldset.pg legend{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2);padding:0 4px}
+.eq{font-family:var(--mono);font-size:13px;background:var(--paper);border:1px solid var(--rule);border-radius:4px;padding:8px 10px;overflow-x:auto;white-space:nowrap}
+
+/* código */
+.codeapp{display:grid;grid-template-columns:270px minmax(0,1fr);gap:14px;align-items:start}
+@media (max-width:820px){.codeapp{grid-template-columns:1fr}}
+.ftree{display:flex;flex-direction:column;gap:10px;border:1px solid var(--rule);border-radius:4px;padding:10px;position:sticky;top:12px;max-height:calc(100vh - 40px);overflow:auto}
+@media (max-width:820px){.ftree{position:static;max-height:220px}}
+.ftree .dir{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);margin-bottom:2px}
+.ftree button{display:flex;justify-content:space-between;gap:8px;width:100%;text-align:left;border:0;background:transparent;border-radius:3px;padding:4px 6px;cursor:pointer;font-family:var(--mono);font-size:12.5px;color:var(--ink)}
+.ftree button span{color:var(--ink-3);font-size:11px;white-space:nowrap;flex:none}
+.ftree button b{min-width:0;overflow-wrap:anywhere}
+.ftree button:hover{background:var(--paper)}
+.ftree button[aria-current="true"]{background:var(--accent-bg);color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
+.cview{display:flex;flex-direction:column;gap:8px;min-width:0}
+.cbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 12px;border-bottom:1px solid var(--rule);padding-bottom:8px}
+.cpath{font-family:var(--mono);font-size:13.5px;font-weight:500;word-break:break-all}
+.outline{display:flex;flex-wrap:wrap;gap:4px}
+.outline button{border:1px solid var(--rule);background:var(--paper);border-radius:3px;padding:1px 7px;font-family:var(--mono);font-size:11.5px;cursor:pointer;color:var(--ink-2)}
+.outline button:hover{border-color:var(--ink);color:var(--ink)}
+.code{border:1px solid var(--rule);border-radius:4px;background:var(--paper);overflow:auto;max-height:72vh;font-family:var(--mono);font-size:12.5px;line-height:1.55}
+.code .cl{display:grid;grid-template-columns:4.2em minmax(0,1fr);min-width:max-content}
+.code .ln{color:var(--ink-3);text-align:right;padding:0 12px 0 0;user-select:none;border-right:1px solid var(--rule);background:var(--sheet);position:sticky;left:0;cursor:pointer}
+.code .lc{white-space:pre;padding:0 14px 0 12px}
+.code .cl.hit{background:var(--warn-bg)}.code .cl.cur{background:var(--accent-bg)}
+.mdview{border:1px solid var(--rule);border-radius:4px;padding:18px 22px;max-height:72vh;overflow:auto}
+.search{border:1px solid var(--rule);border-radius:4px;padding:5px 10px;background:var(--paper);width:190px;max-width:100%}
+.tk-com{color:var(--tk-com);font-style:italic}.tk-str{color:var(--tk-str)}.tk-kw{color:var(--tk-kw)}.tk-num{color:var(--tk-num)}
+.tk-pp{color:var(--tk-pp)}.tk-fn{color:var(--tk-fn)}.tk-ty{color:var(--tk-ty)}.tk-key{color:var(--tk-key)}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="toast" id="toast" role="status" hidden></div>
+<div class="shell">
+  <header class="top">
+    <div class="ttl">
+      <span class="eyebrow">Banco de pruebas · caracterización de FSR402 en silicona · prensa con 2 celdas de 10 kg</span>
+      <h1>Banco FSR</h1>
+      <span class="small"><a href="../" >← Banco E-01 (dedo)</a> · <a href="https://github.com/LuisPonce15/banco-mano-robotica/tree/main/fsr" target="_blank" rel="noopener">código en GitHub</a></span>
+    </div>
+    <div class="chips" aria-live="polite">
+      <div class="chip acc" id="chSrc"><span class="eyebrow">Fuente</span><b id="vSrc">Banco virtual</b></div>
+      <div class="chip" id="chF"><span class="eyebrow">Fuerza</span><b id="vF">—</b></div>
+      <div class="chip" id="chV"><span class="eyebrow">FSR</span><b id="vV">—</b></div>
+      <div class="chip" id="chZ"><span class="eyebrow">Punzón z</span><b id="vZ">—</b></div>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab" role="tab" id="t-ensayo" aria-controls="p-ensayo" aria-selected="true">Ensayo</button>
+    <button class="tab" role="tab" id="t-analisis" aria-controls="p-analisis" aria-selected="false">Análisis</button>
+    <button class="tab" role="tab" id="t-conexiones" aria-controls="p-conexiones" aria-selected="false">Conexiones</button>
+    <button class="tab" role="tab" id="t-montaje" aria-controls="p-montaje" aria-selected="false">Montaje</button>
+    <button class="tab" role="tab" id="t-modelo" aria-controls="p-modelo" aria-selected="false">Modelo</button>
+    <button class="tab" role="tab" id="t-codigo" aria-controls="p-codigo" aria-selected="false">Código</button>
+  </nav>
+
+  <!-- ENSAYO -->
+  <section class="panel" id="p-ensayo" role="tabpanel" aria-labelledby="t-ensayo">
+    <div class="ens">
+      <div class="main">
+        <div class="card">
+          <div class="card-head"><h2>Prensa</h2><span class="small muted" id="pressState">—</span></div>
+          <div class="press"><canvas id="press" aria-label="Vista lateral animada de la prensa: motor, tornillo, punzón, cúpula de silicona y celdas de carga"></canvas></div>
+          <div class="stats" id="stats"></div>
+        </div>
+        <div class="row" style="justify-content:space-between">
+          <div class="row">
+            <span class="small muted">Ventana</span>
+            <div class="seg" id="winSeg"><button data-win="10">10 s</button><button data-win="30" aria-pressed="true">30 s</button><button data-win="120">2 min</button><button data-win="rec">Grabación</button></div>
+          </div>
+          <div class="row"><span class="badge live" id="frzState">En vivo</span><button class="btn sm" id="frz">Congelar</button><button class="btn sm dl" id="pngAll">Guardar gráficas (PNG)</button></div>
+        </div>
+        <div class="charts">
+          <div class="chart" id="chF1"><h3>Fuerza en las celdas</h3><div class="lg" id="lgF"></div><canvas id="cF" aria-label="Fuerza contra tiempo"></canvas></div>
+          <div class="chart"><h3>Salida del FSR</h3><div class="lg" id="lgV"></div><canvas id="cV" aria-label="Voltaje del FSR contra tiempo"></canvas></div>
+          <div class="chart"><h3>Posición del punzón</h3><div class="lg" id="lgZ"></div><canvas id="cZ" aria-label="Posición del punzón contra tiempo"></canvas></div>
+          <div class="chart"><h3>FSR contra fuerza</h3><div class="lg" id="lgXY"></div><canvas id="cXY" aria-label="Voltaje del FSR contra fuerza"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h2>Grabación</h2><span class="badge off" id="recBadge">Sin grabar</span></div>
+          <div class="row">
+            <button class="btn pri" id="recBtn">● Grabar</button>
+            <button class="btn dl" id="recCsv" disabled>Guardar CSV</button>
+            <button class="btn" id="recAn" disabled>Llevar a Análisis</button>
+            <span class="small muted mono" id="recInfo">—</span>
+          </div>
+          <p class="small muted">Graba todo lo que llega del banco (virtual o real). El CSV tiene las columnas <code>t_s, z_mm, F1_N, F2_N, F_N, V_mV, R_ohm, fase, ciclo</code>, las mismas que lee <code>analisis/analizar_ensayo.py</code>.</p>
+        </div>
+        <div class="card">
+          <div class="card-head"><h2>Consola</h2><label class="check"><input type="checkbox" id="showD"> Mostrar líneas de datos</label></div>
+          <pre class="log" id="log" role="log" aria-live="polite"></pre>
+          <div class="tin"><input class="inp" id="cmdIn" placeholder="Comando del firmware (? para ayuda) y Enter" autocomplete="off" aria-label="Comando"><button class="btn" id="cmdSend">Enviar</button></div>
+        </div>
+      </div>
+
+      <aside class="side" aria-label="Panel de mando">
+        <div class="grp">
+          <h3>Fuente de datos <span class="badge sim" id="srcBadge">Simulación</span></h3>
+          <div class="seg" id="srcSeg"><button data-src="virtual" aria-pressed="true">Banco virtual</button><button data-src="usb">ESP32 por USB</button></div>
+          <div class="row" id="usbRow" hidden><button class="btn pri" id="usbConn">Conectar</button><button class="btn" id="usbDisc" disabled>Desconectar</button></div>
+          <div class="row" id="simRow"><span class="small muted">Velocidad</span><div class="seg" id="speedSeg"><button data-sp="1" aria-pressed="true">×1</button><button data-sp="5">×5</button><button data-sp="20">×20</button></div><button class="btn sm" id="simReset">Reiniciar</button></div>
+          <p class="note small" id="usbNote" hidden></p>
+        </div>
+        <div class="grp">
+          <button class="stop" id="stopBtn">DETENER (x)</button>
+          <div class="row"><button class="btn sm" data-c="e">Motor con fuerza (e)</button><button class="btn sm" data-c="d">Soltar (d)</button></div>
+          <div class="row"><button class="btn sm" data-c="t">Tara (t)</button><button class="btn sm" data-c="h">Buscar contacto (h)</button><button class="btn sm" data-c="z">z = 0 aquí</button></div>
+        </div>
+        <div class="grp">
+          <h3>Mover el punzón</h3>
+          <div class="jog"><button class="btn" data-jog="-5">−5</button><button class="btn" data-jog="-1">−1</button><button class="btn" data-jog="-0.1">−0,1</button><button class="btn" data-jog="0.1">+0,1</button><button class="btn" data-jog="1">+1</button><button class="btn" data-jog="5">+5</button></div>
+          <div class="row"><span class="small muted">mm · + baja · velocidad</span><input class="inp" id="vMan" type="number" value="1" step="0.1" min="0.01" style="width:70px"><span class="small muted">mm/s</span><button class="btn sm" id="vSet">Aplicar</button></div>
+        </div>
+        <div class="grp">
+          <h3>Ensayo automático</h3>
+          <div class="seg" id="testSeg"><button data-test="r" aria-pressed="true">Ciclos</button><button data-test="p">Escalones</button></div>
+          <div class="f2" id="testR">
+            <div class="pf"><label for="rD">Profundidad (mm)</label><input id="rD" type="number" value="3" step="0.1"></div>
+            <div class="pf"><label for="rV">Velocidad (mm/s)</label><input id="rV" type="number" value="0.5" step="0.1"></div>
+            <div class="pf"><label for="rP">Pausa (s)</label><input id="rP" type="number" value="2" step="0.5"></div>
+            <div class="pf"><label for="rN">Ciclos</label><input id="rN" type="number" value="3" step="1" min="1"></div>
+          </div>
+          <div class="f2" id="testP" hidden>
+            <div class="pf"><label for="pS">Paso (mm)</label><input id="pS" type="number" value="0.5" step="0.1"></div>
+            <div class="pf"><label for="pN">Escalones</label><input id="pN" type="number" value="6" step="1"></div>
+            <div class="pf"><label for="pP">Pausa por escalón (s)</label><input id="pP" type="number" value="5" step="1"></div>
+            <div class="pf"><label for="pV">Velocidad (mm/s)</label><input id="pV" type="number" value="0.5" step="0.1"></div>
+          </div>
+          <label class="check"><input type="checkbox" id="autoRec" checked> Grabar el ensayo automáticamente</label>
+          <button class="btn pri" id="testGo">Iniciar ensayo</button>
+          <span class="small muted mono" id="testCmd"></span>
+        </div>
+        <div class="grp">
+          <h3>Ajustes del firmware</h3>
+          <div class="f2">
+            <div class="pf"><label for="fLim">Límite de fuerza (N)</label><input id="fLim" type="number" value="40" step="1"></div>
+            <div class="pf"><label for="rmSel">Rm del divisor</label><select id="rmSel"><option value="1000">1 kΩ</option><option value="3300">3,3 kΩ</option><option value="4700">4,7 kΩ</option><option value="10000" selected>10 kΩ</option><option value="22000">22 kΩ</option><option value="47000">47 kΩ</option></select></div>
+            <div class="pf"><label for="modoSel">Celdas</label><select id="modoSel"><option value="suma">Suma (las dos bajo la plataforma)</option><option value="punzon">Punzón (celda 2 en el brazo)</option></select></div>
+            <div class="pf"><label for="hzSel">Datos por segundo</label><select id="hzSel"><option>10</option><option>25</option><option selected>50</option><option>100</option></select></div>
+          </div>
+          <p class="small muted">En el banco virtual, Rm también cambia la resistencia del circuito. En el real, el comando solo le dice al firmware cuál pusiste.</p>
+        </div>
+        <div class="grp">
+          <h3>Calibrar celdas</h3>
+          <div class="row"><input class="inp" id="calG" type="number" value="500" step="50" style="width:90px"><span class="small muted">g encima</span><button class="btn sm" id="cal1">Celda 1 (c1)</button><button class="btn sm" id="cal2">Celda 2 (c2)</button></div>
+          <p class="small muted">Primero la tara sin carga, después la masa conocida. En el banco virtual la masa se pone sola sobre la celda elegida.</p>
+        </div>
+        <div class="grp">
+          <h3>Lecturas</h3>
+          <div class="read" id="reads"></div>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ANÁLISIS -->
+  <section class="panel" id="p-analisis" role="tabpanel" aria-labelledby="t-analisis" hidden>
+    <div class="an">
+      <div class="card">
+        <h2>Ensayos</h2>
+        <div class="dslist" id="dsList"></div>
+        <label class="btn" for="csvIn" style="cursor:pointer">Abrir CSV…</label>
+        <input type="file" id="csvIn" accept=".csv,text/csv" hidden>
+        <p class="small muted">Las grabaciones de la pestaña Ensayo aparecen aquí. También puedes abrir un CSV guardado antes o hecho con <code>registrar_serial.py</code>.</p>
+        <div class="pf"><label for="aY">Eje vertical</label><select id="aY"><option value="V">Voltaje del FSR (mV)</option><option value="R">Resistencia del FSR (Ω, log)</option><option value="G">Conductancia 1/R (µS)</option></select></div>
+        <div class="pf"><label for="aFmin">Fuerza mínima para el ajuste (N)</label><input id="aFmin" type="number" value="0.2" step="0.1"></div>
+        <div class="pf"><label for="aCol">Colorear por</label><select id="aCol"><option value="fase">Carga / descarga</option><option value="ciclo">Ciclo</option></select></div>
+        <div class="row"><button class="btn sm dl" id="aPng">Guardar gráfica (PNG)</button><button class="btn sm dl" id="aRes">Guardar resultados (CSV)</button></div>
+      </div>
+      <div class="main">
+        <div class="kpis" id="kpis"></div>
+        <div class="chart big"><h3 id="aTitle">Curva del FSR</h3><div class="lg" id="lgA"></div><canvas id="cA" aria-label="Curva del FSR contra fuerza con ajuste"></canvas></div>
+        <div class="charts">
+          <div class="chart"><h3>Fuerza y FSR en el tiempo</h3><div class="lg" id="lgAT"></div><canvas id="cAT" aria-label="Fuerza y FSR contra tiempo del ensayo"></canvas></div>
+          <div class="chart"><h3>Fuerza contra profundidad</h3><div class="lg" id="lgAD"></div><canvas id="cAD" aria-label="Fuerza contra profundidad: rigidez de la silicona"></canvas></div>
+        </div>
+        <div class="card small muted" id="aNotes"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CONEXIONES -->
+  <section class="panel" id="p-conexiones" role="tabpanel" aria-labelledby="t-conexiones" hidden>
+    <div class="card">
+      <div class="card-head"><h2>Esquemático</h2><span class="small muted">Haz clic en un cable para ver de dónde a dónde va. Los valores en magenta son las lecturas en vivo.</span></div>
+      <div class="legend">
+        <span style="color:var(--w12)"><i class="sw"></i>12 V</span><span style="color:var(--w3)"><i class="sw"></i>3,3 V</span><span style="color:var(--wgnd)"><i class="sw"></i>GND</span>
+        <span style="color:var(--wsig)"><i class="sw"></i>Señal</span><span style="color:var(--wusb)"><i class="sw"></i>USB</span><span style="color:var(--wmot)"><i class="sw"></i>Motor y celdas: colores reales del cable</span>
+      </div>
+      <div class="schem" id="schem"></div>
+      <div class="detail" id="wDetail"></div>
+    </div>
+    <div class="two">
+      <div class="card"><h2>Pines del ESP32</h2><div class="tbl"><table><thead><tr><th>GPIO</th><th>Función</th><th>Va a</th></tr></thead><tbody>
+        <tr><td class="m">25</td><td>STEP</td><td>A4988 STEP</td></tr>
+        <tr><td class="m">26</td><td>DIR</td><td>A4988 DIR</td></tr>
+        <tr><td class="m">27</td><td>EN (LOW = con fuerza)</td><td>A4988 EN</td></tr>
+        <tr><td class="m">16 / 17</td><td>DT / SCK celda 1</td><td>HX711-1</td></tr>
+        <tr><td class="m">18 / 19</td><td>DT / SCK celda 2</td><td>HX711-2</td></tr>
+        <tr><td class="m">34</td><td>ADC1 · nodo del divisor</td><td>FSR402 + Rm</td></tr>
+        <tr><td class="m">3V3</td><td>Lógica</td><td>A4988 VDD, MS1–3, RST+SLP · HX711 VCC · FSR</td></tr>
+        <tr><td class="m">GND</td><td>Tierra común</td><td>A4988 (las dos GND) · HX711 · Rm</td></tr>
+        <tr><td class="m">USB</td><td>Alimentación y datos</td><td>Computador</td></tr>
+      </tbody></table></div></div>
+      <div class="card"><h2>Celda de carga → HX711</h2><div class="tbl"><table><thead><tr><th>Hilo</th><th>HX711</th><th>Qué es</th></tr></thead><tbody>
+        <tr><td><i class="cchip" style="background:#d0312d"></i>Rojo</td><td class="m">E+</td><td>Excitación +</td></tr>
+        <tr><td><i class="cchip" style="background:#18212d"></i>Negro</td><td class="m">E−</td><td>Excitación −</td></tr>
+        <tr><td><i class="cchip" style="background:#ffffff"></i>Blanco</td><td class="m">A−</td><td>Señal −</td></tr>
+        <tr><td><i class="cchip" style="background:#2f9a3f"></i>Verde</td><td class="m">A+</td><td>Señal +</td></tr>
+      </tbody></table></div>
+      <p class="small muted">Si al presionar la fuerza sale negativa no cambies cables: la calibración (<code>c1</code>, <code>c2</code>) corrige el signo.</p></div>
+    </div>
+    <div class="card">
+      <h2>Divisor del FSR: elige Rm</h2>
+      <p class="small muted">V = 3,3 V · Rm / (Rm + R<sub>FSR</sub>). El rango útil del ADC del ESP32 va de ~0,1 a ~3,1 V. Una Rm grande da mucha sensibilidad con poca fuerza y se satura antes.</p>
+      <div class="charts">
+        <div class="chart"><h3>Voltaje contra fuerza para varias Rm</h3><div class="lg" id="lgRm"></div><canvas id="cRm" aria-label="Voltaje del divisor contra fuerza para varias resistencias"></canvas></div>
+        <div class="card" style="border:0;padding:0"><div id="rmAdvice" class="small"></div>
+          <div class="f2"><div class="pf"><label for="rmF1">Fuerza mínima de interés (N)</label><input id="rmF1" type="number" value="0.5" step="0.1"></div><div class="pf"><label for="rmF2">Fuerza máxima de interés (N)</label><input id="rmF2" type="number" value="30" step="1"></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="card"><h2>Lista de cables</h2><input class="search" id="wq" type="search" placeholder="Buscar cable o pin" aria-label="Buscar cable"><div class="tbl"><table id="wtable"><thead><tr><th>ID</th><th>Desde</th><th>Hasta</th><th>Calibre</th><th>Color</th><th>Nota</th></tr></thead><tbody></tbody></table></div></div>
+  </section>
+
+  <!-- MONTAJE -->
+  <section class="panel" id="p-montaje" role="tabpanel" aria-labelledby="t-montaje" hidden>
+    <div class="card">
+      <h2>El montaje</h2>
+      <div class="photos" id="photos"></div>
+    </div>
+    <div class="card doc" id="docMontaje"></div>
+    <div class="card doc" id="docConex"></div>
+    <div class="card doc" id="docCal"></div>
+  </section>
+
+  <!-- MODELO -->
+  <section class="panel" id="p-modelo" role="tabpanel" aria-labelledby="t-modelo" hidden>
+    <div class="card">
+      <div class="card-head"><h2>Parámetros del banco virtual</h2><button class="btn sm" id="pReset">Valores por defecto</button></div>
+      <p class="small muted">Cambia los valores para que el banco virtual se parezca al tuyo. Se aplican al instante en la pestaña Ensayo. Los de la silicona y del FSR son estimaciones de catálogo: el ensayo real es lo que los reemplaza.</p>
+      <div class="params" id="params"></div>
+    </div>
+    <div class="charts">
+      <div class="chart"><h3>Silicona: fuerza contra profundidad</h3><div class="lg" id="lgM1"></div><canvas id="cM1" aria-label="Curva fuerza profundidad de la cúpula"></canvas></div>
+      <div class="chart"><h3>FSR: resistencia contra fuerza</h3><div class="lg" id="lgM2"></div><canvas id="cM2" aria-label="Resistencia del FSR contra fuerza"></canvas></div>
+    </div>
+    <div class="card doc">
+      <h2>Cómo calcula el banco virtual</h2>
+      <h3>Punzón y tornillo</h3>
+      <p>El firmware cuenta pasos: z = pasos / (200 · micropasos / avance). La tuerca tiene juego b, y el marco impreso cede con rigidez k<sub>marco</sub>. La profundidad real en la silicona es menor que la que cree el firmware:</p>
+      <div class="eq">d = z + z₀ + b·(½ − F/(F + W<sub>brazo</sub>)) − F / k<sub>marco</sub></div>
+      <p>Si el torque que pide la fuerza, T = (F + fricción) · avance / (2π·η), supera el del motor, el motor pierde pasos y la diferencia se acumula.</p>
+      <h3>Cúpula de silicona</h3>
+      <p>Contacto de Hertz de un punzón plano contra una esfera de radio R. Mientras el radio de contacto a = √(R·d) sea menor que el del punzón:</p>
+      <div class="eq">F<sub>e</sub> = (4/3) · E* · √R · d^1,5      E* = E / (1 − ν²)</div>
+      <p>Cuando el contacto llena el punzón (a = r<sub>p</sub>), sigue como punzón plano: dF/dd = 2·E*·r<sub>p</sub>. La viscoelasticidad es un sólido lineal estándar: F = (1 − g)·F<sub>e</sub> + q, con dq/dt = g·dF<sub>e</sub>/dt − q/τ. Por eso la fuerza cae un poco durante las pausas y la curva depende de la velocidad.</p>
+      <h3>FSR dentro de la silicona</h3>
+      <p>Solo una fracción φ de la fuerza pasa por el área activa del FSR (radio 6,35 mm). La presión se reparte como una campana de ancho s² = a²/3 + (z<sub>FSR</sub>/2)², y el FSR, más rígido que la silicona, concentra un poco la carga (c ≈ 1,3):</p>
+      <div class="eq">φ = min(1, c · (1 − exp(−r<sub>act</sub>² / 2s²)))      F<sub>FSR</sub> = φ · F</div>
+      <p>La resistencia sigue una ley de potencia con saturación, histéresis al descargar y deriva lenta con la carga sostenida:</p>
+      <div class="eq">R = R₁ · (F<sub>FSR</sub> / 1 N)^(−n) + R<sub>sat</sub>      (R = R<sub>off</sub> si F<sub>FSR</sub> &lt; F<sub>on</sub>)</div>
+      <h3>Celdas y ADC</h3>
+      <p>Cada HX711 entrega cuentas = offset + k·F + ruido, a 10 u 80 muestras/s (ruido de 50 o 90 nV, ≈ 35 o 62 cuentas). k real ≈ 21 900 cuentas/N, distinto en cada celda: por eso hay que calibrar. El ADC del ESP32 agrega ruido de unos milivoltios y se satura cerca de 3,1 V.</p>
+    </div>
+  </section>
+
+  <!-- CÓDIGO -->
+  <section class="panel" id="p-codigo" role="tabpanel" aria-labelledby="t-codigo" hidden>
+    <div class="card">
+      <div class="card-head"><h2>Código del banco FSR</h2>
+        <div class="row"><a class="btn sm" href="https://github.com/LuisPonce15/banco-mano-robotica/tree/main/fsr" target="_blank" rel="noopener">Carpeta en GitHub</a>
+        <a class="btn sm" href="https://github.com/LuisPonce15/banco-mano-robotica/archive/refs/heads/main.zip" target="_blank" rel="noopener">Descargar todo (.zip)</a></div></div>
+      <p class="small muted" id="cIntro">Firmware, documentación y scripts de análisis de este banco, tal como están en GitHub.</p>
+      <div class="codeapp">
+        <nav class="ftree" id="ftree" aria-label="Archivos"></nav>
+        <div class="cview">
+          <div class="cbar">
+            <div style="display:flex;flex-direction:column;gap:2px;min-width:0"><span class="cpath" id="cPath">—</span><span class="small muted" id="cMeta"></span></div>
+            <div class="row">
+              <input class="search" id="cFind" type="search" placeholder="Buscar en el archivo" aria-label="Buscar en el archivo">
+              <span class="small muted mono" id="cHits"></span>
+              <button class="btn sm" id="cPrev" aria-label="Anterior">↑</button><button class="btn sm" id="cNext" aria-label="Siguiente">↓</button>
+              <button class="btn sm" id="cMd" hidden>Ver fuente</button><button class="btn sm" id="cCopy">Copiar</button><button class="btn sm" id="cDown">Descargar</button>
+              <a class="btn sm" id="cGh" href="#" target="_blank" rel="noopener">GitHub</a>
+            </div>
+          </div>
+          <div class="outline" id="cOut"></div>
+          <div class="code" id="cBody" tabindex="0"></div>
+          <div class="mdview doc" id="cDoc" hidden></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!--@REPO_FILES@-->
+<!--@REPO_IMAGES@-->
+<!--@INCLUDE web/comun/repo.js@-->
+
+<script>
+(() => {
+"use strict";
+const R = window.Repo;
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const fmt = (v, d = 2) => Number.isFinite(v) ? v.toFixed(d).replace('.', ',').replace(/^-(0,0*)$/, '$1') : '—';
+const esc = R.esc, store = R.store;
+const G = 9.80665;
+
+/* ================= utilidades: aviso, copiar, descargar ================= */
+let toastT = 0;
+function toast(m) {const el = $('#toast'); el.textContent = m; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => el.hidden = true, 3500)}
+async function copyText(t) {try {await navigator.clipboard.writeText(t); toast('Copiado')} catch (e) {toast('No se pudo copiar: selecciona el texto a mano')}}
+let DL = null;
+(async () => {try {DL = await (window.claude && window.claude.use ? window.claude.use('downloads') : null)} catch (e) {DL = null}
+  const can = !!DL || !window.claude; $$('.dl').forEach(b => b.hidden = !can)})();
+async function saveBlob(blob, name) {
+  if (DL) {try {const r = await DL.save({filename: name, data: blob}); if (r && r.status === 'saved') toast('Guardado: ' + name)}
+    catch (e) {const c = e && e.code; if (c !== 'declined') toast(c === 'rate_limited' ? 'Ya hay una descarga pendiente.' : 'No se pudo guardar (' + (c || 'error') + ').')} return}
+  if (window.claude) {toast('Guardar archivos funciona al abrir la página en claude.ai.'); return}
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
+  setTimeout(() => {URL.revokeObjectURL(a.href); a.remove()}, 1000); toast('Descargado: ' + name);
+}
+const saveText = (t, name) => saveBlob(new Blob([t], {type: 'text/plain'}), name);
+function stamp() {const d = new Date(), z = n => String(n).padStart(2, '0'); return `${d.getFullYear()}${z(d.getMonth() + 1)}${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}`}
+let CSSV = {};
+function readCSS() {const cs = getComputedStyle(document.documentElement); ['--ink','--ink-2','--ink-3','--rule','--grid','--sheet','--paper','--accent','--teal','--violet','--warn','--danger','--ok','--frame','--metal','--silicone','--silicone-ed','--motor','--pink','--wgnd'].forEach(k => CSSV[k] = cs.getPropertyValue(k).trim())}
+readCSS(); matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readCSS);
+new MutationObserver(readCSS).observe(document.documentElement, {attributes: true, attributeFilter: ['data-theme']});
+
+/* ================= parámetros del banco virtual ================= */
+const MATS = {
+  ecoflex30: ['Ecoflex 00-30', 0.10, 0.10], ecoflex50: ['Ecoflex 00-50', 0.13, 0.10], ds10: ['Dragon Skin 10', 0.18, 0.08],
+  ds20: ['Dragon Skin 20', 0.34, 0.07], ds30: ['Dragon Skin 30', 0.59, 0.06], sylgard: ['Sylgard 184 (10:1)', 1.5, 0.04]
+};
+const DEF = {
+  lead: 1.25, micro: 16, eta: 0.3, Irun: 1.0, Irated: 1.7, Thold: 0.42, armW: 0.6, backlash: 0.05, kFrame: 80, gap0: 3,
+  mat: 'ds20', E: 0.34, g1: 0.07, tau: 3, Rd: 20, hd: 18, rp: 8,
+  zF: 5, rAct: 6.35, R1: 10000, n: 0.9, Rsat: 200, Fon: 0.15, hyst: 0.12, creep: 0.03, conc: 1.3, var: 1.0,
+  adcNoise: 6, hxRate: 10, share: 0.5, platN: 1.2, kErr1: 1.07, kErr2: 0.94
+};
+const P = Object.assign({}, DEF, store.get('fsrP', {}));
+const PARAMS = [
+  ['Tornillo y motor', [
+    ['lead', 'Avance del tornillo (mm/vuelta)', 'sel', [[1.25, 'M8 · 1,25'], [2, 'T8 · 2'], [8, 'T8 · 8']]],
+    ['eta', 'Eficiencia tornillo-tuerca η', 'num', 0.05, 0.9, 0.05],
+    ['Irun', 'Corriente del A4988 (A)', 'num', 0.2, 1.7, 0.05],
+    ['backlash', 'Juego de la tuerca (mm)', 'num', 0, 0.5, 0.01],
+    ['kFrame', 'Rigidez del marco impreso (N/mm)', 'num', 5, 1000, 5],
+    ['gap0', 'Altura inicial sobre la cúpula (mm)', 'num', 0.5, 20, 0.5]]],
+  ['Cúpula de silicona', [
+    ['mat', 'Material', 'sel', Object.entries(MATS).map(([k, v]) => [k, v[0]]).concat([['custom', 'Otro (E abajo)']])],
+    ['E', 'Módulo E (MPa)', 'num', 0.02, 5, 0.01],
+    ['g1', 'Relajación g (0–0,5)', 'num', 0, 0.5, 0.01],
+    ['tau', 'Tiempo de relajación τ (s)', 'num', 0.2, 60, 0.1],
+    ['Rd', 'Radio de la cúpula (mm)', 'num', 5, 50, 0.5],
+    ['hd', 'Altura de la cúpula (mm)', 'num', 3, 50, 0.5],
+    ['rp', 'Radio del punzón (mm)', 'num', 1, 30, 0.5]]],
+  ['FSR402', [
+    ['zF', 'Profundidad del FSR bajo la superficie (mm)', 'num', 0.5, 30, 0.5],
+    ['R1', 'R a 1 N (Ω)', 'num', 1000, 100000, 500],
+    ['n', 'Exponente n', 'num', 0.4, 1.5, 0.05],
+    ['Rsat', 'R de saturación (Ω)', 'num', 0, 2000, 10],
+    ['Fon', 'Fuerza de encendido (N)', 'num', 0.01, 2, 0.01],
+    ['hyst', 'Histéresis al descargar (0–0,5)', 'num', 0, 0.5, 0.01],
+    ['creep', 'Deriva por década de tiempo', 'num', 0, 0.2, 0.005],
+    ['var', 'Variación de la pieza (×R)', 'num', 0.5, 2, 0.05]]],
+  ['Celdas y ADC', [
+    ['hxRate', 'Muestras/s del HX711', 'sel', [[10, '10 (RATE a GND)'], [80, '80 (RATE a VCC)']]],
+    ['share', 'Parte de la carga en la celda 2 (modo suma)', 'num', 0, 1, 0.05],
+    ['platN', 'Peso de plataforma + cúpula (N)', 'num', 0, 10, 0.1],
+    ['adcNoise', 'Ruido del ADC del ESP32 (mV)', 'num', 0, 40, 1],
+    ['kErr1', 'Sensibilidad real celda 1 (× nominal)', 'num', 0.8, 1.2, 0.01],
+    ['kErr2', 'Sensibilidad real celda 2 (× nominal)', 'num', 0.8, 1.2, 0.01]]]
+];
+function buildParams() {
+  $('#params').innerHTML = PARAMS.map(([g, ps]) => `<fieldset class="pg"><legend>${g}</legend>${ps.map(([k, l, t, a, b, s]) => {
+    const id = 'p_' + k;
+    const ctl = t === 'sel' ? `<select id="${id}">${a.map(([v, n]) => `<option value="${v}" ${String(P[k]) === String(v) ? 'selected' : ''}>${n}</option>`).join('')}</select>`
+      : `<input id="${id}" type="number" min="${a}" max="${b}" step="${s}" value="${P[k]}">`;
+    return `<div class="pf"><label for="${id}">${l}</label>${ctl}</div>`}).join('')}</fieldset>`).join('');
+}
+buildParams();
+$('#params').addEventListener('change', e => {
+  const k = e.target.id.replace(/^p_/, ''); if (!(k in P)) return;
+  let v = e.target.value; v = k === 'mat' ? v : +v; if (k !== 'mat' && !Number.isFinite(v)) return;
+  P[k] = v;
+  if (k === 'mat' && MATS[v]) {P.E = MATS[v][1]; P.g1 = MATS[v][2]; $('#p_E').value = P.E; $('#p_g1').value = P.g1}
+  if (k === 'E' || k === 'g1') {P.mat = 'custom'; $('#p_mat').value = 'custom'}
+  store.set('fsrP', P); drawModel(); drawRm();
+});
+$('#pReset').onclick = () => {Object.assign(P, DEF); store.set('fsrP', {}); buildParams(); drawModel(); drawRm(); toast('Valores por defecto')};
+
+/* ================= física ================= */
+const SPMM = () => 200 * 16 / P.lead;            // pasos por mm (firmware con 1/16)
+function silicone(d) {                           // fuerza elástica instantánea (N) para profundidad d (mm)
+  if (d <= 0) return 0;
+  const Es = P.E / (1 - 0.49 * 0.49), Rr = P.Rd, rp = P.rp, ds = rp * rp / Rr;
+  let F = d <= ds ? (4 / 3) * Es * Math.sqrt(Rr) * Math.pow(d, 1.5)
+                  : (4 / 3) * Es * Math.sqrt(Rr) * Math.pow(ds, 1.5) + 2 * Es * rp * (d - ds);
+  return F * (1 + 3 * Math.pow(Math.min(d / P.hd, 0.95), 4));
+}
+function fsrFraction(d) {
+  const a = Math.min(Math.sqrt(P.Rd * Math.max(d, 0)), P.rp), zs = Math.max(0.5, P.zF * (1 - d / (2 * P.Rd)));
+  const s2 = a * a / 3 + Math.pow(0.5 * zs, 2) + 0.01;
+  return Math.min(1, P.conc * (1 - Math.exp(-P.rAct * P.rAct / (2 * s2))));
+}
+function fsrR(Fs, unloadX = -1, tLoad = 0) {    // resistencia (Ω)
+  if (Fs < P.Fon) return 5e6;
+  let Gc = Math.pow(Fs, P.n) / (P.R1 * P.var);
+  if (unloadX >= 0) Gc *= 1 + P.hyst * 4 * unloadX * (1 - unloadX);
+  Gc *= 1 + P.creep * Math.log10(1 + tLoad);
+  return Math.min(5e6, 1 / Gc + P.Rsat);
+}
+let seed = 12345; const rnd = () => {seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296};
+const gauss = () => {let u = 0, v = 0; while (!u) u = rnd(); v = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v)};
+
+/* Banco virtual: mecánica + sensores + firmware emulado (mismo protocolo que fsr_ensayo.ino) */
+class VirtualBench {
+  constructor(out) {this.out = out; this.reset()}
+  reset() {
+    this.t = 0; this.ms = 0;
+    this.mot = {pos: 0, v: 0, target: 0, vmax: 1, acc: 5, run: false};
+    this.zOff = -P.gap0; this.d = 0; this.zm = -P.gap0; this.Fs = 0; this.Rfsr = 5e6; this.F = 0; this.Fe = 0; this.q = 0; this.FePrev = 0; this.lost = 0;
+    this.fs = {peak: 0, prev: 0, tLoad: 0, unload: false};
+    this.hx = [0, 1].map(i => ({next: 0, ready: false, raw: 0, off: Math.round((i ? -52000 : 38000)), k: 21898, offset: 0, tLast: 0}));
+    this.calMass = [0, 0]; this.Rm = 10000;
+    Object.assign(this, {enabled: false, homed: false, sum: true, vManual: 1, fLimit: 40, rm: 10000, hz: 50, lastMv: 0, mode: 'IDLE', prog: [], iSeg: -1, segStarted: false, segT0: 0, phase: 0, cyc: 0, tData: 0, pending: [], booted: false});
+    this.boot();
+  }
+  say(s) {this.out('# ' + s)}
+  /* ---- motor tipo FastAccelStepper ---- */
+  spmm() {return SPMM()}
+  setSpeed(v) {v = clamp(v, 0.01, 10); this.mot.vmax = v * this.spmm(); this.mot.acc = 5 * this.spmm()}
+  moveTo(st) {this.mot.target = st; this.mot.run = true}
+  forceStop() {this.mot.v = 0; this.mot.run = false; this.mot.target = Math.round(this.mot.pos)}
+  running() {return this.mot.run}
+  pos() {return Math.round(this.mot.pos)}
+  zNow() {return this.pos() / this.spmm()}
+  stepMotor(dt) {
+    const m = this.mot; if (!m.run) return;
+    const dist = m.target - m.pos, dir = Math.sign(dist);
+    if (Math.abs(dist) < 0.5 && Math.abs(m.v) <= m.acc * dt * 2) {m.pos = m.target; m.v = 0; m.run = false; return}
+    const vdes = dir * Math.min(m.vmax, Math.sqrt(2 * m.acc * Math.abs(dist)));
+    m.v += clamp(vdes - m.v, -m.acc * dt, m.acc * dt);
+    const old = m.pos; m.pos += m.v * dt;
+    if (Math.sign(m.target - m.pos) !== dir && dir !== 0) {m.pos = m.target; m.v = 0; m.run = false}
+    // pérdida de pasos si el torque no alcanza (solo bajando)
+    const T = (this.F + 2) * (P.lead / 1000) / (2 * Math.PI * P.eta), Tav = P.Thold * Math.min(1, P.Irun / P.Irated) * 0.7;
+    if (this.enabled === false) {this.zOff -= (m.pos - old) / this.spmm()}           // sin fuerza: el eje no se mueve con los pasos
+    else if (T > Tav && m.pos > old) {const dz = (m.pos - old) / this.spmm(); this.zOff -= dz; this.lost += dz}
+  }
+  /* ---- mecánica y sensores ---- */
+  physics(dt) {
+    const zn = this.pos() / this.spmm() + this.zOff;
+    const zm = zn + P.backlash * (0.5 - this.F / (this.F + P.armW));
+    const d = Math.max(0, zm - this.F / P.kFrame);
+    this.d = d; this.zm = zm;
+    const Fe = silicone(d), dFe = Fe - this.FePrev; this.FePrev = Fe;
+    this.q += P.g1 * dFe - this.q * dt / P.tau;
+    let F = (1 - P.g1) * Fe + this.q; if (F < 0 || d <= 0) {F = Math.max(0, F); if (d <= 0) F = 0}
+    this.F = F;
+    // FSR
+    const Fs = F * fsrFraction(d), fs = this.fs;
+    if (Fs < P.Fon) {fs.peak = 0; fs.tLoad = 0; fs.unload = false}
+    else {fs.tLoad += dt; if (Fs > fs.peak) {fs.peak = Fs; fs.unload = false} else if (Fs < fs.prev - 1e-4) fs.unload = true}
+    fs.prev = Fs; this.Fs = Fs;
+    this.Rfsr = fsrR(Fs, fs.unload && fs.peak > 0 ? clamp(Fs / fs.peak, 0, 1) : -1, fs.tLoad);
+    // HX711
+    const plat = P.platN, cal = this.calMass.map(g => g / 1000 * G);
+    const F1 = this.sum ? (F + plat) * (1 - P.share) + cal[0] : F + plat + cal[0];
+    const F2 = this.sum ? (F + plat) * P.share + cal[1] : F + cal[1];
+    const sig = P.hxRate >= 80 ? 62 : 35, kk = [P.kErr1, P.kErr2];
+    [F1, F2].forEach((Fi, i) => {const h = this.hx[i]; if (this.t >= h.next) {h.next = this.t + 1 / P.hxRate; h.raw = Math.round(h.off + 21898 * kk[i] * Fi + sig * gauss()); h.ready = true}});
+  }
+  adcMv() {const V = 3300 * this.Rm / (this.Rm + this.Rfsr); return clamp(V + P.adcNoise / Math.sqrt(8) * gauss(), 0, 3130)}
+  /* ---- firmware emulado ---- */
+  hxRead(i) {const h = this.hx[i]; if (!h.ready) return false; h.ready = false; h.tLast = this.ms; return true}
+  N(i) {const h = this.hx[i]; return (h.raw - h.offset) / h.k}
+  fTotal() {return this.sum ? this.N(0) + this.N(1) : this.N(0)}
+  setEnable(on) {this.enabled = on}
+  stopAll(why) {this.forceStop(); this.mode = 'IDLE'; this.prog = []; this.iSeg = -1; this.phase = 0; if (why) this.say(why)}
+  boot() {
+    this.say('=== Banco FSR · caracterización === (banco virtual)');
+    this.help(); this.say('Haciendo tara inicial (deja la plataforma sin contacto)...');
+    this.pending.push({at: 1.7, fn: () => {this.tare(); this.status()}});
+  }
+  help() {['?  ayuda            s  estado', 'e / d               motor con fuerza / suelto', 't                   tara de las celdas (sin contacto)', 'c1 500 / c2 500     calibrar celda 1 / 2 con 500 g encima', 'v 1                 velocidad manual (mm/s)', 'm 2.5               mover 2,5 mm (+ baja, - sube)', 'z                   esta posición es z = 0', 'h                   buscar el contacto con la silicona', 'r 3 0.5 2 3         ciclos: prof. mm, mm/s, pausa s, ciclos', 'p 0.5 6 5 0.5       escalones: paso mm, n, pausa s, mm/s', 'f 40                límite de fuerza (N)', 'o 50                datos por segundo (0 = apagado)', 'rm 10000            resistencia del divisor del FSR', 'modo suma | modo punzon', 'x                   detener'].forEach(l => this.say(l))}
+  tare() {this.hx.forEach(h => h.offset = h.raw); this.say('Tara lista. Celda 1: ok · Celda 2: ok')}
+  status() {
+    const m = {IDLE: 'quieto', MANUAL: 'moviendo', SEEK: 'buscando_contacto', TEST: 'ensayo'}[this.mode];
+    this.out(`S,${+this.enabled},${+this.homed},${m},${this.zNow().toFixed(4)},${this.N(0).toFixed(4)},${this.N(1).toFixed(4)},${this.lastMv.toFixed(1)},${this.fLimit.toFixed(1)},${this.rm.toFixed(0)},${this.sum ? 'suma' : 'punzon'},${this.hx[0].k.toFixed(1)},${this.hx[1].k.toFixed(1)},${P.lead.toFixed(3)}`);
+    this.say(`Motor ${this.enabled ? 'con fuerza' : 'suelto'} · ${m} · z = ${this.zNow().toFixed(3)} mm${this.homed ? '' : ' (sin contacto definido)'}`);
+    this.say(`F1 = ${this.N(0).toFixed(3)} N · F2 = ${this.N(1).toFixed(3)} N · F = ${this.fTotal().toFixed(3)} N (${this.sum ? 'suma de las dos' : 'solo celda 1'})`);
+    this.say(`FSR: ${this.lastMv.toFixed(0)} mV con Rm = ${this.rm.toFixed(0)} Ω · límite ${this.fLimit.toFixed(1)} N`);
+  }
+  canTest() {
+    if (!this.enabled) {this.say('Primero habilita el motor con e.'); return false}
+    if (!this.homed) {this.say('Primero busca el contacto con h (o define z = 0 con z).'); return false}
+    if (this.mode !== 'IDLE') {this.say('Hay un movimiento en curso. Detén con x.'); return false}
+    return true;
+  }
+  startProgram(name) {this.iSeg = 0; this.segStarted = false; this.mode = 'TEST'; this.say(`INICIO ${name} (${this.prog.length} tramos)`)}
+  cmd(line) {
+    line = line.trim(); if (!line) return;
+    const sp = line.indexOf(' '), c = (sp < 0 ? line : line.slice(0, sp)).toLowerCase(), rest = sp < 0 ? '' : line.slice(sp + 1);
+    const a = rest.trim().split(/\s+/).filter(Boolean).slice(0, 4).map(x => parseFloat(x.replace(',', '.')) || 0); while (a.length < 4) a.push(NaN);
+    const na = rest.trim() ? rest.trim().split(/\s+/).length : 0, A = i => Number.isFinite(a[i]) ? a[i] : 0;
+    switch (c) {
+      case '?': this.help(); break;
+      case 's': this.status(); break;
+      case 'e': this.setEnable(true); this.say('Motor con fuerza (EN = LOW).'); break;
+      case 'd': this.stopAll(); this.setEnable(false); this.say('Motor suelto (EN = HIGH).'); break;
+      case 'x': this.stopAll('Detenido.'); break;
+      case 't': if (this.mode !== 'IDLE') this.say('Detén el movimiento antes de la tara.'); else this.pending.push({at: this.t + 1.6, fn: () => this.tare()}); break;
+      case 'c1': case 'c2': this.calibrate(c === 'c1' ? 0 : 1, A(0)); break;
+      case 'v': this.vManual = clamp(A(0), 0.01, 10); this.say(`Velocidad manual: ${this.vManual.toFixed(2)} mm/s`); break;
+      case 'z': if (this.mode !== 'IDLE') this.say('Detén primero.'); else {this.zOff += this.zNow(); this.mot.pos = 0; this.mot.target = 0; this.homed = true; this.say('z = 0 aquí.')} break;
+      case 'm': {
+        if (!this.enabled) {this.say('Primero habilita el motor con e.'); break}
+        if (this.mode === 'TEST' || this.mode === 'SEEK') {this.say('Hay un ensayo en curso. Detén con x.'); break}
+        const tg = this.zNow() + A(0);
+        if (this.homed && tg > 20) {this.say('No bajo más de 20 mm bajo el contacto.'); break}
+        this.setSpeed(this.vManual); this.moveTo(Math.round(tg * this.spmm())); this.mode = 'MANUAL'; break;
+      }
+      case 'h':
+        if (!this.enabled) {this.say('Primero habilita el motor con e.'); break}
+        if (this.mode !== 'IDLE') {this.say('Detén primero con x.'); break}
+        if (this.fTotal() > 0.05) {this.say('Ya hay fuerza: sube el punzón (m -2) o repite la tara (t).'); break}
+        this.zOff += this.zNow(); this.mot.pos = 0; this.homed = false;
+        this.setSpeed(0.5); this.moveTo(Math.round(40 * this.spmm())); this.mode = 'SEEK';
+        this.say('Buscando el contacto a 0,5 mm/s (máx. 40 mm)...'); break;
+      case 'r': this.cycles(A(0), na > 1 ? A(1) : 0.5, na > 2 ? A(2) : 2, na > 3 ? Math.trunc(A(3)) : 3); break;
+      case 'p': this.steps(A(0), na > 1 ? Math.trunc(A(1)) : 5, na > 2 ? A(2) : 5, na > 3 ? A(3) : 0.5); break;
+      case 'f': this.fLimit = clamp(A(0), 0.5, 0.95 * 98.07 * (this.sum ? 2 : 1)); this.say(`Límite de fuerza: ${this.fLimit.toFixed(1)} N`); break;
+      case 'o': this.hz = clamp(Math.trunc(A(0)), 0, 100); this.say(`Datos: ${this.hz} por segundo`); break;
+      case 'rm': if (A(0) > 0) {this.rm = A(0); this.Rm = A(0)} this.say(`Rm = ${this.rm.toFixed(0)} Ω`); break;
+      case 'modo': {const r = rest.trim().toLowerCase(); if (r.startsWith('s')) this.sum = true; else if (r.startsWith('p')) this.sum = false;
+        this.say(this.sum ? 'Modo suma: las dos celdas sostienen la plataforma, F = F1 + F2.' : 'Modo punzón: la celda 1 mide la fuerza (F = F1) y la celda 2 sirve de comparación.'); break}
+      default: this.say('No entendí. Escribe ? para ver los comandos.');
+    }
+  }
+  calibrate(i, g) {
+    if (g <= 0) {this.say('Escribe la masa en gramos, por ejemplo: c1 500'); return}
+    this.calMass[i] = g; this.say(`(banco virtual) Puse ${g} g sobre la celda ${i + 1}.`);
+    this.pending.push({at: this.t + 2.4, fn: () => {
+      const h = this.hx[i], d = h.raw - h.offset;
+      if (Math.abs(d) < 500) this.say('Casi no veo carga. ¿Pusiste la masa? ¿Hiciste la tara sin ella?');
+      else {h.k = d / (g / 1000 * G); this.say(`Celda ${i + 1} calibrada: ${h.k.toFixed(1)} cuentas/N (guardado).`)}
+      this.calMass[i] = 0; this.say(`(banco virtual) Quité la masa de la celda ${i + 1}.`);
+    }});
+  }
+  cycles(depth, v, pause, n) {
+    if (!this.canTest()) return;
+    if (!(depth > 0 && depth <= 20)) {this.say('Profundidad entre 0 y 20 mm.'); return}
+    v = clamp(v, 0.01, 5); pause = clamp(pause, 0, 600); n = clamp(n, 1, 39);
+    const p = [{z: -0.5, v: 1, ph: 3, c: 0}];
+    for (let c = 1; c <= n; c++) p.push({z: depth, v, ph: 1, c}, {hold: pause, ph: 2, c}, {z: -0.5, v, ph: 3, c}, {hold: pause, ph: 4, c});
+    this.prog = p; this.startProgram('ciclos');
+  }
+  steps(step, n, pause, v) {
+    if (!this.canTest()) return;
+    if (!(step > 0 && n >= 1 && step * n <= 20)) {this.say('Paso × escalones debe quedar entre 0 y 20 mm.'); return}
+    v = clamp(v, 0.01, 5); pause = clamp(pause, 0, 600); n = Math.min(n, 39);
+    const p = [{z: -0.5, v: 1, ph: 3, c: 0}, {z: 0, v, ph: 1, c: 1}];
+    for (let i = 1; i <= n; i++) p.push({z: i * step, v, ph: 1, c: 1}, {hold: pause, ph: 2, c: 1});
+    for (let i = n - 1; i >= 0; i--) p.push({z: i * step, v, ph: 3, c: 1}, {hold: pause, ph: 4, c: 1});
+    p.push({z: -0.5, v, ph: 3, c: 1});
+    this.prog = p; this.startProgram('escalones');
+  }
+  runProgram() {
+    if (this.mode !== 'TEST') return;
+    if (this.iSeg >= this.prog.length) {this.mode = 'IDLE'; this.phase = 0; this.say('FIN del ensayo'); return}
+    const s = this.prog[this.iSeg]; this.phase = s.ph; this.cyc = s.c;
+    if (!this.segStarted) {this.segStarted = true; this.segT0 = this.t; if (s.hold == null) {this.setSpeed(s.v); this.moveTo(Math.round(s.z * this.spmm()))} return}
+    if (s.hold != null ? this.t - this.segT0 >= s.hold : !this.running()) {this.iSeg++; this.segStarted = false}
+  }
+  checkForce() {
+    const F = this.fTotal(), worst = Math.max(Math.abs(this.N(0)), Math.abs(this.N(1)));
+    if (this.mode === 'SEEK' && F >= 0.05) {
+      this.forceStop(); this.zOff += this.zNow(); this.mot.pos = 0; this.mot.target = 0; this.homed = true; this.mode = 'IDLE';
+      this.say('Contacto encontrado: z = 0. Subo 0,5 mm.'); this.setSpeed(0.5); this.moveTo(Math.round(-0.5 * this.spmm())); this.mode = 'MANUAL'; return;
+    }
+    if (F > this.fLimit || worst > 0.95 * 98.07) {
+      const down = this.running() && this.mot.target > this.mot.pos;
+      if (this.mode === 'TEST' || down) {this.stopAll(); this.say(`ALTO: fuerza ${F.toFixed(2)} N supera el límite (${this.fLimit.toFixed(1)} N). Subo 1 mm.`);
+        this.setSpeed(1); this.moveTo(this.pos() - Math.round(this.spmm())); this.mode = 'MANUAL'}
+    }
+  }
+  tick(dt) {
+    this.t += dt; this.ms = Math.round(this.t * 1000);
+    this.stepMotor(dt); this.physics(dt);
+    for (let k = this.pending.length - 1; k >= 0; k--) if (this.t >= this.pending[k].at) {const p = this.pending.splice(k, 1)[0]; p.fn()}
+    const n1 = this.hxRead(0), n2 = this.hxRead(1); if (n1 || n2) this.checkForce();
+    if (this.mode === 'MANUAL' && !this.running()) this.mode = 'IDLE';
+    if (this.mode === 'SEEK' && !this.running()) {this.mode = 'IDLE'; this.say('No encontré contacto en 40 mm. ¿La muestra está debajo? ¿INVERT_DIR?')}
+    this.runProgram();
+    if (this.hz > 0 && this.ms - this.tData >= Math.floor(1000 / this.hz)) {
+      this.tData = this.ms; this.lastMv = this.adcMv();
+      this.out(`D,${this.ms},${this.zNow().toFixed(4)},${this.N(0).toFixed(4)},${this.N(1).toFixed(4)},${this.lastMv.toFixed(1)},${this.phase},${this.cyc}`);
+    }
+  }
+}
+
+/* ================= datos (mismo formato para virtual y USB) ================= */
+const DH = {s: [], rec: null, recOn: false, meta: {rm: 10000, suma: true}, last: null, frozen: null};
+const MAXS = 90000;
+function pushSample(x) {
+  const s = DH.s; if (s.length && x.t < s[s.length - 1].t - 0.5) s.length = 0;   // el ESP32 se reinició
+  s.push(x); if (s.length > MAXS) s.splice(0, s.length - MAXS);
+  if (DH.recOn) DH.rec.push(x);
+  DH.last = x;
+}
+function onLine(line) {
+  if (!line) return;
+  if (line.startsWith('D,')) {
+    const p = line.split(','); if (p.length < 8) return;
+    const t = +p[1] / 1000, z = +p[2], f1 = +p[3], f2 = +p[4], V = +p[5], ph = +p[6], cy = +p[7];
+    if (![t, z, f1, f2, V].every(Number.isFinite)) return;
+    const F = DH.meta.suma ? f1 + f2 : f1, Rf = V > 1 ? DH.meta.rm * (3300 - V) / V : Infinity;
+    pushSample({t, z, f1, f2, F, V, R: Rf, ph, cy});
+    if ($('#showD').checked) logLine(line, 'dt');
+    return;
+  }
+  if (line.startsWith('S,')) {const p = line.split(','); DH.meta.rm = +p[9] || DH.meta.rm; DH.meta.suma = p[10] === 'suma'; DH.status = p; syncSettingsFromStatus(p); return}
+  if (line.startsWith('# ')) {
+    const msg = line.slice(2); logLine(msg, /ALTO|Error|no responde|No encontr|SIN RESPUESTA/.test(msg) ? 'er' : '');
+    if (/^INICIO /.test(msg) && $('#autoRec').checked && SRC.autoRecNext) {SRC.autoRecNext = false; startRec()}
+    if (/^FIN del ensayo/.test(msg) && DH.recOn && SRC.stopRecOnFin) {SRC.stopRecOnFin = false; stopRec(true)}
+    if (/^ALTO/.test(msg) && DH.recOn && SRC.stopRecOnFin) {SRC.stopRecOnFin = false; stopRec(true)}
+    if (/^Modo suma/.test(msg)) DH.meta.suma = true; if (/^Modo punzón/.test(msg)) DH.meta.suma = false;
+    const m = msg.match(/^Rm = (\d+)/); if (m) DH.meta.rm = +m[1];
+    return;
+  }
+  logLine(line, '');
+}
+function syncSettingsFromStatus(p) {
+  const rm = String(Math.round(+p[9])); if ([...$('#rmSel').options].some(o => o.value === rm)) $('#rmSel').value = rm;
+  $('#modoSel').value = p[10] === 'suma' ? 'suma' : 'punzon'; $('#fLim').value = (+p[8]).toFixed(0);
+}
+const logEl = $('#log');
+function logLine(text, cls) {
+  const s = document.createElement('span'); s.className = cls || ''; s.textContent = (cls === 'tx' ? '> ' : '') + text + '\n';
+  logEl.appendChild(s); while (logEl.childNodes.length > 600) logEl.removeChild(logEl.firstChild); logEl.scrollTop = logEl.scrollHeight;
+}
+
+/* ================= fuentes: banco virtual y USB ================= */
+const SRC = {kind: 'virtual', vb: null, speed: 1, port: null, reader: null, writer: null, buf: '', autoRecNext: false, stopRecOnFin: false};
+function startVirtual(autoplay) {
+  seed = 12345; SRC.vb = new VirtualBench(onLine); DH.s.length = 0; DH.meta = {rm: 10000, suma: true};
+  if (autoplay) {
+    const vb = SRC.vb;
+    vb.pending.push({at: 2.0, fn: () => send('e')}, {at: 2.3, fn: () => send('h')});
+    const wait = () => {if (!SRC.vb || SRC.vb !== vb) return; if (vb.homed && vb.mode === 'IDLE') {send('r 3 0.8 1 30')} else vb.pending.push({at: vb.t + 0.3, fn: wait})};
+    vb.pending.push({at: 2.6, fn: wait});
+  }
+}
+async function send(cmd) {
+  cmd = String(cmd); logLine(cmd, 'tx');
+  if (SRC.kind === 'virtual') {if (SRC.vb) SRC.vb.cmd(cmd); return true}
+  if (!SRC.writer) {toast('Conecta el ESP32 primero'); return false}
+  try {await SRC.writer.write(new TextEncoder().encode(cmd + '\n')); return true} catch (e) {logLine('Error al escribir: ' + e.message, 'er'); return false}
+}
+function setSource(kind) {
+  if (kind === SRC.kind) return;
+  if (SRC.kind === 'usb') disconnect(false);
+  SRC.kind = kind;
+  $$('#srcSeg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.src === kind));
+  $('#usbRow').hidden = kind !== 'usb'; $('#simRow').hidden = kind !== 'virtual';
+  DH.s.length = 0; DH.last = null;
+  if (kind === 'virtual') {startVirtual(false); setBadge()} else {SRC.vb = null; setBadge(); const n = $('#usbNote');
+    if (!('serial' in navigator)) {n.hidden = false; n.textContent = 'Este navegador no tiene Web Serial. Abre la página en Chrome o Edge de escritorio, desde luisponce15.github.io/banco-mano-robotica/fsr/.'} else n.hidden = true}
+}
+function setBadge() {
+  const b = $('#srcBadge'), on = SRC.kind === 'usb' && SRC.port;
+  b.textContent = SRC.kind === 'virtual' ? 'Simulación' : on ? 'Conectado' : 'Desconectado';
+  b.className = 'badge ' + (SRC.kind === 'virtual' ? 'sim' : on ? 'live' : 'off');
+  $('#vSrc').textContent = SRC.kind === 'virtual' ? 'Banco virtual' : on ? 'ESP32 (USB)' : 'USB sin conectar';
+  $('#chSrc').className = 'chip ' + (SRC.kind === 'virtual' ? 'acc' : on ? 'ok' : 'warn');
+  $('#usbConn').disabled = !!on; $('#usbDisc').disabled = !on;
+}
+async function connect() {
+  const n = $('#usbNote'); n.hidden = true;
+  if (!('serial' in navigator)) {n.hidden = false; n.textContent = 'Este navegador no tiene Web Serial. Usa Chrome o Edge de escritorio con la página de GitHub Pages.'; return}
+  try {
+    const port = await navigator.serial.requestPort(); await port.open({baudRate: 115200});
+    SRC.port = port; SRC.writer = port.writable.getWriter(); setBadge(); logLine('Puerto abierto. El ESP32 se reinicia al conectar.', 'sys');
+    readLoop(); setTimeout(() => send('s'), 2500);
+  } catch (e) {
+    if (e && e.name === 'NotFoundError') return; n.hidden = false;
+    n.textContent = e && e.name === 'SecurityError' ? 'El navegador no permite USB dentro de esta vista. Abre la página de GitHub Pages en Chrome o Edge.'
+      : e && e.name === 'InvalidStateError' ? 'El puerto está abierto en otro programa (¿el Monitor Serie de Arduino?). Ciérralo y vuelve a intentar.' : 'No se pudo abrir el puerto: ' + (e && e.message || e);
+  }
+}
+async function readLoop() {
+  const dec = new TextDecoder();
+  while (SRC.port && SRC.port.readable) {
+    try {SRC.reader = SRC.port.readable.getReader();
+      for (;;) {const {value, done} = await SRC.reader.read(); if (done) break;
+        SRC.buf += dec.decode(value, {stream: true}); let k; while ((k = SRC.buf.indexOf('\n')) >= 0) {const ln = SRC.buf.slice(0, k).replace(/\r$/, ''); SRC.buf = SRC.buf.slice(k + 1); onLine(ln)}}}
+    catch (e) {if (SRC.port) logLine('Lectura interrumpida: ' + e.message, 'er')}
+    finally {try {SRC.reader.releaseLock()} catch (_) {}}
+    if (!SRC.port) break;
+  }
+}
+async function disconnect(lost) {
+  const p = SRC.port; SRC.port = null;
+  try {if (SRC.reader) await SRC.reader.cancel()} catch (_) {}
+  try {SRC.writer && SRC.writer.releaseLock()} catch (_) {}
+  SRC.writer = null; try {p && await p.close()} catch (_) {}
+  if (p) logLine(lost ? 'Se perdió la conexión con el ESP32.' : 'Puerto cerrado.', 'sys'); setBadge();
+}
+if ('serial' in navigator) navigator.serial.addEventListener('disconnect', () => {if (SRC.port) disconnect(true)});
+
+/* ================= grabación ================= */
+function startRec() {DH.rec = []; DH.recOn = true; DH.recT0 = DH.last ? DH.last.t : 0; updRec()}
+function stopRec(toAnalysis) {DH.recOn = false; updRec(); if (toAnalysis && DH.rec && DH.rec.length > 20) {addDataset(recName(), DH.rec); toast('Ensayo grabado y llevado a Análisis')}}
+function recName() {const v = SRC.kind === 'virtual' ? 'virtual' : 'ESP32'; const d = new Date(), z = n => String(n).padStart(2, '0'); return `${v} · ${z(d.getHours())}:${z(d.getMinutes())}:${z(d.getSeconds())}`}
+function updRec() {
+  const n = DH.rec ? DH.rec.length : 0;
+  $('#recBtn').textContent = DH.recOn ? '■ Detener grabación' : '● Grabar';
+  $('#recBadge').textContent = DH.recOn ? 'Grabando' : n ? 'Grabación lista' : 'Sin grabar'; $('#recBadge').className = 'badge ' + (DH.recOn ? 'rec' : n ? 'live' : 'off');
+  $('#recCsv').disabled = !n || DH.recOn; $('#recAn').disabled = !n || DH.recOn;
+  $('#recInfo').textContent = n ? `${n} muestras · ${fmt(DH.rec[n - 1].t - DH.rec[0].t, 1)} s` : '—';
+}
+function toCSV(rows) {
+  const t0 = rows.length ? rows[0].t : 0;
+  return 't_s,z_mm,F1_N,F2_N,F_N,V_mV,R_ohm,fase,ciclo\n' + rows.map(r => [(r.t - t0).toFixed(3), r.z.toFixed(4), r.f1.toFixed(4), r.f2.toFixed(4), r.F.toFixed(4), r.V.toFixed(1), Number.isFinite(r.R) ? r.R.toFixed(1) : 'inf', r.ph, r.cy].join(',')).join('\n') + '\n';
+}
+$('#recBtn').onclick = () => DH.recOn ? stopRec(false) : startRec();
+$('#recCsv').onclick = () => {if (DH.rec && DH.rec.length) saveText(toCSV(DH.rec), `ensayo-fsr-${stamp()}.csv`)};
+$('#recAn').onclick = () => {if (DH.rec && DH.rec.length) {addDataset(recName(), DH.rec); setTab('analisis')}};
+
+/* ================= gráficas ================= */
+const dpr = () => window.devicePixelRatio || 1;
+function canvasCtx(cv, hCss) {
+  const r = cv.getBoundingClientRect(); const w = r.width; if (!w) return null; const h = hCss || r.height, d = dpr();
+  if (cv.width !== Math.round(w * d) || cv.height !== Math.round(h * d)) {cv.width = Math.round(w * d); cv.height = Math.round(h * d)}
+  const g = cv.getContext('2d'); g.setTransform(d, 0, 0, d, 0, 0); g.clearRect(0, 0, w, h); return {g, w, h};
+}
+function ticks(lo, hi, n = 5) {
+  const span = hi - lo || 1, raw = span / n, mag = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / mag;
+  const st = (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * mag, out = [];
+  for (let v = Math.ceil(lo / st) * st; v <= hi + st * 1e-6; v += st) out.push(Math.abs(v) < st * 1e-9 ? 0 : v);
+  return {t: out, st};
+}
+function tfmt(v, st) {const d = st >= 1 ? 0 : Math.min(4, Math.ceil(-Math.log10(st))); return fmt(v, d)}
+/* plot genérico: series de líneas o puntos, ejes lineales o log en y */
+function plot(cv, o) {
+  const c = canvasCtx(cv); if (!c) return null; const {g, w, h} = c;
+  const L = 52, Rr = 12, T = 8, B = 30, pw = w - L - Rr, ph = h - T - B;
+  let {xLo, xHi, yLo, yHi} = o;
+  const logY = !!o.logY;
+  if (logY) {yLo = Math.log10(Math.max(yLo, 1e-9)); yHi = Math.log10(Math.max(yHi, yLo * 1.0001 + 1e-9))}
+  if (!(yHi > yLo)) {yHi = yLo + 1} if (!(xHi > xLo)) {xHi = xLo + 1}
+  const X = x => L + (x - xLo) / (xHi - xLo) * pw, Y = y => T + ph - ((logY ? Math.log10(Math.max(y, 1e-9)) : y) - yLo) / (yHi - yLo) * ph;
+  g.font = '11px "JetBrains Mono",monospace'; g.lineWidth = 1;
+  // rejilla y ejes
+  const xt = ticks(xLo, xHi, Math.max(3, Math.floor(pw / 80)));
+  g.strokeStyle = CSSV['--grid']; g.fillStyle = CSSV['--ink-3']; g.textAlign = 'center'; g.textBaseline = 'top';
+  xt.t.forEach(v => {const x = X(v); g.beginPath(); g.moveTo(x, T); g.lineTo(x, T + ph); g.stroke(); g.fillText(tfmt(v, xt.st), x, T + ph + 6)});
+  g.textAlign = 'right'; g.textBaseline = 'middle';
+  if (logY) {for (let e = Math.floor(yLo); e <= Math.ceil(yHi); e++) {if (e < yLo - 1e-9 || e > yHi + 1e-9) continue; const y = T + ph - (e - yLo) / (yHi - yLo) * ph;
+      g.beginPath(); g.moveTo(L, y); g.lineTo(L + pw, y); g.stroke(); const v = Math.pow(10, e); g.fillText(v >= 1e6 ? fmt(v / 1e6, 0) + 'M' : v >= 1e3 ? fmt(v / 1e3, 0) + 'k' : fmt(v, v < 1 ? 2 : 0), L - 6, y)}}
+  else {const yt = ticks(yLo, yHi, Math.max(3, Math.floor(ph / 40))); yt.t.forEach(v => {const y = Y(v); g.beginPath(); g.moveTo(L, y); g.lineTo(L + pw, y); g.stroke(); g.fillText(tfmt(v, yt.st), L - 6, y)})}
+  g.strokeStyle = CSSV['--rule']; g.strokeRect(L, T, pw, ph);
+  if (o.xLabel) {g.fillStyle = CSSV['--ink-2']; g.textAlign = 'right'; g.textBaseline = 'bottom'; g.fillText(o.xLabel, L + pw, h - 1)}
+  if (o.yLabel) {g.save(); g.fillStyle = CSSV['--ink-2']; g.translate(11, T + ph / 2); g.rotate(-Math.PI / 2); g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(o.yLabel, 0, 0); g.restore()}
+  // referencias horizontales
+  (o.refs || []).forEach(r => {const y = Y(r.y); if (y < T || y > T + ph) return; g.save(); g.setLineDash([5, 4]); g.strokeStyle = r.color; g.beginPath(); g.moveTo(L, y); g.lineTo(L + pw, y); g.stroke(); g.restore();
+    g.fillStyle = r.color; g.textAlign = 'left'; g.textBaseline = 'bottom'; g.fillText(r.label, L + 4, y - 2)});
+  g.save(); g.beginPath(); g.rect(L, T, pw, ph); g.clip();
+  o.series.forEach(s => {
+    if (s.points) {g.fillStyle = s.color; const r = s.r || 1.6; for (let i = 0; i < s.xs.length; i++) {const x = s.xs[i], y = s.ys[i]; if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+        if (s.colors) g.fillStyle = s.colors[i]; g.fillRect(X(x) - r, Y(y) - r, 2 * r, 2 * r)} return}
+    g.strokeStyle = s.color; g.lineWidth = s.lw || 1.8; g.setLineDash(s.dash || []); g.beginPath(); let pen = false;
+    for (let i = 0; i < s.xs.length; i++) {const x = s.xs[i], y = s.ys[i]; if (!Number.isFinite(x) || !Number.isFinite(y)) {pen = false; continue} const px = X(x), py = Y(y); if (pen) g.lineTo(px, py); else {g.moveTo(px, py); pen = true}}
+    g.stroke(); g.setLineDash([]);
+  });
+  g.restore();
+  return {X, Y, L, T, pw, ph, xLo, xHi, yLo, yHi, logY};
+}
+function range(arrs, padFrac = 0.08, floor0 = false) {
+  let lo = Infinity, hi = -Infinity; arrs.forEach(a => {for (const v of a) if (Number.isFinite(v)) {if (v < lo) lo = v; if (v > hi) hi = v}});
+  if (!Number.isFinite(lo)) return [0, 1]; if (floor0) lo = Math.min(lo, 0); const p = (hi - lo || Math.abs(hi) || 1) * padFrac; return [lo - p, hi + p];
+}
+function legend(el, items) {el.innerHTML = items.map(([c, l, v]) => `<span><i style="background:${c}"></i>${l}${v != null ? ' <b>' + v + '</b>' : ''}</span>`).join('')}
+
+/* ventana de datos para las gráficas en vivo */
+let WIN = 30;
+function windowData() {
+  if (DH.frozen) return DH.frozen;
+  let s = DH.s;
+  if (WIN === 'rec') s = DH.rec && DH.rec.length ? DH.rec : [];
+  else if (s.length) {const tEnd = s[s.length - 1].t; let lo = 0, hi = s.length - 1; while (lo < hi) {const m = (lo + hi) >> 1; if (s[m].t < tEnd - WIN) lo = m + 1; else hi = m} s = s.slice(lo)}
+  const step = Math.max(1, Math.floor(s.length / 2500)); return step > 1 ? s.filter((_, i) => i % step === 0) : s.slice();
+}
+const PHCOL = ph => ph === 1 ? CSSV['--accent'] : ph === 3 ? CSSV['--teal'] : CSSV['--ink-3'];
+function drawLive() {
+  const d = windowData(), n = d.length, last = n ? d[n - 1] : null;
+  const tEnd = WIN === 'rec' || DH.frozen ? (n ? d[n - 1].t : 0) : (last ? last.t : 0);
+  const rel = WIN !== 'rec' && !DH.frozen, ts = d.map(x => rel ? x.t - tEnd : x.t - (n ? d[0].t : 0));
+  const xLo = rel ? -WIN : 0, xHi = rel ? 0 : (n ? ts[n - 1] : 1);
+  const F = d.map(x => x.F), f1 = d.map(x => x.f1), f2 = d.map(x => x.f2), V = d.map(x => x.V), Z = d.map(x => x.z);
+  const lim = DH.status ? +DH.status[8] : (SRC.vb ? SRC.vb.fLimit : 40);
+  const [fy0, fy1] = range([F, f1, f2], 0.1, true);
+  plot($('#cF'), {xLo, xHi, yLo: fy0, yHi: Math.max(fy1, 0.5), xLabel: 't (s)', yLabel: 'N', refs: fy1 > lim * 0.6 ? [{y: lim, color: CSSV['--danger'], label: 'límite'}] : [],
+    series: [{xs: ts, ys: f1, color: CSSV['--violet'], lw: 1.2}, {xs: ts, ys: f2, color: CSSV['--teal'], lw: 1.2}, {xs: ts, ys: F, color: CSSV['--ink'], lw: 2}]});
+  legend($('#lgF'), [[CSSV['--ink'], DH.meta.suma ? 'F = F1 + F2' : 'F = F1', last ? fmt(last.F, 2) + ' N' : null], [CSSV['--violet'], 'F1', last ? fmt(last.f1, 2) : null], [CSSV['--teal'], 'F2', last ? fmt(last.f2, 2) : null]]);
+  plot($('#cV'), {xLo, xHi, yLo: 0, yHi: 3300, xLabel: 't (s)', yLabel: 'mV', refs: [{y: 3100, color: CSSV['--warn'], label: 'saturación del ADC'}], series: [{xs: ts, ys: V, color: CSSV['--accent'], lw: 1.8}]});
+  legend($('#lgV'), [[CSSV['--accent'], 'V del divisor', last ? fmt(last.V, 0) + ' mV' : null], [CSSV['--ink-3'], 'R FSR', last ? fmtR(last.R) : null]]);
+  const [zy0, zy1] = range([Z], 0.15);
+  plot($('#cZ'), {xLo, xHi, yLo: zy0, yHi: zy1, xLabel: 't (s)', yLabel: 'mm', refs: [{y: 0, color: CSSV['--ink-3'], label: 'contacto (z = 0)'}], series: [{xs: ts, ys: Z, color: CSSV['--ink'], lw: 1.8}]});
+  legend($('#lgZ'), [[CSSV['--ink'], 'z (+ hacia abajo)', last ? fmt(last.z, 3) + ' mm' : null]]);
+  const [xf0, xf1] = range([F], 0.05, true);
+  plot($('#cXY'), {xLo: xf0, xHi: Math.max(xf1, 0.5), yLo: 0, yHi: 3300, xLabel: 'F (N)', yLabel: 'mV', series: [{points: true, xs: F, ys: V, colors: d.map(x => PHCOL(x.ph)), color: CSSV['--accent'], r: 1.5}]});
+  legend($('#lgXY'), [[CSSV['--accent'], 'cargando'], [CSSV['--teal'], 'descargando'], [CSSV['--ink-3'], 'pausa o libre']]);
+}
+function fmtR(r) {return !Number.isFinite(r) || r > 4e6 ? 'abierto' : r >= 1e3 ? fmt(r / 1e3, r >= 1e5 ? 0 : 1) + ' kΩ' : fmt(r, 0) + ' Ω'}
+$$('#winSeg button').forEach(b => b.onclick = () => {WIN = b.dataset.win === 'rec' ? 'rec' : +b.dataset.win; $$('#winSeg button').forEach(x => x.setAttribute('aria-pressed', x === b)); DH.frozen = null; updFrz()});
+function updFrz() {$('#frz').textContent = DH.frozen ? 'Volver a en vivo' : 'Congelar'; $('#frzState').textContent = DH.frozen ? 'Congelada' : 'En vivo'; $('#frzState').className = 'badge ' + (DH.frozen ? 'frozen' : 'live')}
+$('#frz').onclick = () => {DH.frozen = DH.frozen ? null : windowData(); updFrz()};
+$('#pngAll').onclick = () => {
+  const ids = ['cF', 'cV', 'cZ', 'cXY'], cs = ids.map(i => $('#' + i)), w = cs[0].width, h = cs[0].height, pad = 40 * dpr();
+  const out = document.createElement('canvas'); out.width = w * 2 + pad * 3; out.height = h * 2 + pad * 4; const g = out.getContext('2d');
+  g.fillStyle = CSSV['--sheet']; g.fillRect(0, 0, out.width, out.height); g.fillStyle = CSSV['--ink']; g.font = `${600} ${22 * dpr()}px "Barlow Condensed",sans-serif`;
+  g.fillText('Banco FSR · ' + (SRC.kind === 'virtual' ? 'banco virtual' : 'ESP32') + ' · ' + new Date().toLocaleString('es-CO'), pad, pad * 0.9);
+  const titles = ['Fuerza (N)', 'FSR (mV)', 'Posición (mm)', 'FSR contra fuerza']; g.font = `${14 * dpr()}px "Barlow",sans-serif`;
+  cs.forEach((c, i) => {const x = pad + (i % 2) * (w + pad), y = pad * 1.6 + Math.floor(i / 2) * (h + pad * 1.2); g.fillStyle = CSSV['--ink-2']; g.fillText(titles[i], x, y - 6); g.drawImage(c, x, y)});
+  out.toBlob(b => b && saveBlob(b, `graficas-fsr-${stamp()}.png`), 'image/png');
+};
+
+/* ================= prensa animada ================= */
+function drawPress() {
+  const c = canvasCtx($('#press')); if (!c) return; const {g, w, h} = c, C = CSSV;
+  const last = DH.last, vb = SRC.kind === 'virtual' ? SRC.vb : null;
+  const zf = last ? last.z : 0;                                   // posición que reporta el firmware
+  const dTrue = vb ? vb.d : Math.max(0, zf);                      // profundidad en la silicona
+  const zAbs = vb ? vb.zm : zf;                                   // punzón respecto al ápice
+  const F = last ? last.F : 0, f1 = last ? last.f1 : 0, f2 = last ? last.f2 : 0;
+  const s = Math.min(4.2, (h - 40) / 80), cx = Math.min(w * 0.42, 330), base = h - 18;
+  // base y torre
+  g.fillStyle = C['--metal']; g.globalAlpha = .35; g.fillRect(16, base, w - 32, 6); g.globalAlpha = 1;
+  const towerX = cx - 120, towerW = 54, towerTop = 18;
+  g.fillStyle = C['--frame']; g.globalAlpha = .9; g.fillRect(towerX, towerTop, towerW, base - towerTop); g.globalAlpha = 1;
+  g.fillStyle = C['--sheet']; g.fillRect(towerX + 8, towerTop + 10, towerW - 16, base - towerTop - 70);
+  // motor
+  g.fillStyle = C['--motor']; g.fillRect(towerX + 4, base - 56, towerW - 8, 50);
+  g.fillStyle = C['--ink-3']; g.font = '10px "JetBrains Mono",monospace'; g.textAlign = 'center'; g.fillText('NEMA 17', towerX + towerW / 2, base - 26);
+  // tornillo (rayas que giran con z)
+  const scrX = towerX + towerW / 2, apexY = base - 40 - (P.hd) * s - 30;
+  const turn = (zf / P.lead) % 1;
+  g.strokeStyle = C['--ink-3']; g.lineWidth = 3; g.beginPath(); g.moveTo(scrX, towerTop + 4); g.lineTo(scrX, base - 56); g.stroke();
+  g.strokeStyle = C['--ink-2']; g.lineWidth = 1;
+  for (let y = towerTop + 6 + ((turn * 8) % 8 + 8) % 8; y < base - 58; y += 8) {g.beginPath(); g.moveTo(scrX - 4, y); g.lineTo(scrX + 4, y + 3); g.stroke()}
+  // cúpula sobre plataforma
+  const domeCx = cx + 60, platY = apexY + P.hd * s + 4, Rpx = P.Rd * s, Hpx = P.hd * s;
+  const defl = (fv, k) => Math.min(10, fv * k);
+  const bend1 = defl(Math.max(0, f1), 0.25), bend2 = defl(Math.max(0, f2), 0.25);
+  // celdas en voladizo (deformación exagerada)
+  const cellY = platY + 14, cellL = Math.max(120, domeCx - towerX + 40);
+  [[0, bend1, C['--violet'], 'celda 1'], [1, bend2, C['--teal'], 'celda 2']].forEach(([i, b, col, lab]) => {
+    if (i === 1 && !DH.meta.suma) return;
+    const y = cellY + i * 16;
+    g.strokeStyle = C['--metal']; g.lineWidth = 9; g.beginPath(); g.moveTo(towerX + towerW, y); g.quadraticCurveTo(towerX + towerW + cellL * .55, y, towerX + towerW + cellL, y + b); g.stroke();
+    g.strokeStyle = col; g.lineWidth = 2; g.beginPath(); g.moveTo(towerX + towerW + cellL * .45, y - 4); g.lineTo(towerX + towerW + cellL * .55, y - 4); g.stroke();
+    g.fillStyle = C['--ink-2']; g.textAlign = 'left'; g.fillText(lab, towerX + towerW + cellL + 8, y + 3 + b);
+  });
+  const platDrop = DH.meta.suma ? (bend1 + bend2) / 2 : bend1;
+  g.fillStyle = C['--frame']; g.fillRect(domeCx - Rpx - 18, platY + platDrop, 2 * Rpx + 36, 8);
+  // cúpula deformada
+  const dpx = dTrue * s, spread = 1 + 0.18 * dTrue / P.Rd, top = platY + platDrop - Hpx + dpx;
+  g.save(); g.beginPath(); g.ellipse(domeCx, platY + platDrop, Rpx * spread, Hpx, 0, Math.PI, 2 * Math.PI); g.closePath(); g.clip();
+  g.fillStyle = C['--silicone']; g.fillRect(domeCx - Rpx * 1.5, top, Rpx * 3, platY + platDrop - top);
+  g.restore();
+  g.strokeStyle = C['--silicone-ed']; g.lineWidth = 1.5; g.beginPath();
+  g.ellipse(domeCx, platY + platDrop, Rpx * spread, Hpx, 0, Math.PI, 2 * Math.PI); g.stroke();
+  if (dpx > 0.5) {g.clearRect(domeCx - Rpx * 1.6, top - 200, Rpx * 3.2, 200); g.strokeStyle = C['--silicone-ed']; g.beginPath(); const hw = Math.min(Rpx * spread, Math.sqrt(Math.max(0, 2 * Rpx * dpx))); g.moveTo(domeCx - hw, top); g.lineTo(domeCx + hw, top); g.stroke()}
+  // FSR dentro
+  const fsY = top + P.zF * s, frac = Math.min(1, (vb ? vb.Fs : F * 0.7) / 20);
+  g.fillStyle = C['--accent']; g.globalAlpha = 0.25 + 0.75 * frac; g.fillRect(domeCx - P.rAct * s, Math.min(fsY, platY + platDrop - 3), 2 * P.rAct * s, 3); g.globalAlpha = 1;
+  g.fillStyle = C['--ink-2']; g.textAlign = 'left'; g.fillText('FSR402', domeCx + P.rAct * s + 6, Math.min(fsY, platY + platDrop - 3) + 4);
+  // brazo rosado y punzón
+  const punchBottom = platY + platDrop - Hpx + Math.max(-60, Math.min(zAbs, 30)) * s;
+  const armY = punchBottom - 34;
+  g.fillStyle = C['--pink']; g.fillRect(scrX - 16, armY - 10, domeCx - scrX + 30, 18);
+  g.fillRect(domeCx - P.rp * s, armY + 8, 2 * P.rp * s, punchBottom - armY - 8);
+  g.fillStyle = C['--ink']; g.fillRect(scrX - 7, armY - 14, 14, 6);
+  // flecha de fuerza y etiquetas
+  g.fillStyle = C['--ink']; g.font = '600 15px "Barlow Condensed",sans-serif'; g.textAlign = 'left';
+  const tx = Math.min(w - 210, domeCx + Rpx + 50);
+  g.fillText(`F = ${fmt(F, 2)} N`, tx, armY - 8);
+  g.font = '12px "JetBrains Mono",monospace'; g.fillStyle = C['--ink-2'];
+  g.fillText(`z = ${fmt(zf, 3)} mm`, tx, armY + 12);
+  if (vb) g.fillText(`profundidad real ${fmt(dTrue, 3)} mm`, tx, armY + 30);
+  if (last) g.fillText(`FSR ${fmt(last.V, 0)} mV · ${fmtR(last.R)}`, tx, armY + (vb ? 48 : 30));
+  if (F > 0.05) {g.strokeStyle = C['--accent']; g.lineWidth = 2; const ay = top - 46; g.beginPath(); g.moveTo(domeCx + Rpx + 26, ay); g.lineTo(domeCx + Rpx + 26, ay + 30); g.stroke();
+    g.beginPath(); g.moveTo(domeCx + Rpx + 20, ay + 22); g.lineTo(domeCx + Rpx + 26, ay + 30); g.lineTo(domeCx + Rpx + 32, ay + 22); g.stroke()}
+}
+
+/* ================= lecturas y estado ================= */
+function updReadouts() {
+  const L = DH.last, vb = SRC.kind === 'virtual' ? SRC.vb : null;
+  const lim = DH.status ? +DH.status[8] : (vb ? vb.fLimit : 40);
+  $('#vF').textContent = L ? fmt(L.F, 2) + ' N' : '—'; $('#chF').className = 'chip ' + (!L ? '' : L.F > lim ? 'bad' : L.F > lim * 0.8 ? 'warn' : 'ok');
+  $('#vV').textContent = L ? fmt(L.V, 0) + ' mV' : '—'; $('#chV').className = 'chip ' + (!L ? '' : L.V > 3080 ? 'warn' : 'ok');
+  $('#vZ').textContent = L ? fmt(L.z, 3) + ' mm' : '—';
+  const st = vb ? ({IDLE: 'quieto', MANUAL: 'moviendo', SEEK: 'buscando el contacto', TEST: 'ensayo'}[vb.mode] + (vb.homed ? '' : ' · sin contacto definido') + (vb.enabled ? '' : ' · motor suelto'))
+    : SRC.port ? 'ESP32 conectado' : 'sin conexión';
+  const phTxt = L ? ['libre', 'cargando', 'pausa con carga', 'descargando', 'pausa sin carga'][L.ph] || '—' : '—';
+  $('#pressState').textContent = st + (L && L.cy ? ` · ciclo ${L.cy} · ${phTxt}` : '');
+  $('#stats').innerHTML = [['Fuerza F', L ? fmt(L.F, 3) + ' N' : '—'], ['Celda 1', L ? fmt(L.f1, 3) + ' N' : '—'], ['Celda 2', L ? fmt(L.f2, 3) + ' N' : '—'], ['FSR', L ? fmt(L.V, 0) + ' mV' : '—'], ['R FSR', L ? fmtR(L.R) : '—'], ['z', L ? fmt(L.z, 3) + ' mm' : '—']]
+    .map(([k, v]) => `<div class="stat">${k}<b>${v}</b></div>`).join('');
+  $('#reads').innerHTML = [['Fase', phTxt], ['Ciclo', L ? (L.cy || '—') : '—'], ['Rm', fmt(DH.meta.rm / 1000, 1) + ' kΩ'], ['Celdas', DH.meta.suma ? 'suma' : 'punzón'],
+    ['Pasos perdidos', vb ? fmt(vb.lost, 3) + ' mm' : '—'], ['Muestras', String(DH.s.length)]].map(([k, v]) => `<div>${k}<b>${v}</b></div>`).join('');
+  updRec(); updLiveSchem();
+}
+
+/* ================= controles de Ensayo ================= */
+$$('#srcSeg button').forEach(b => b.onclick = () => setSource(b.dataset.src));
+$$('#speedSeg button').forEach(b => b.onclick = () => {SRC.speed = +b.dataset.sp; $$('#speedSeg button').forEach(x => x.setAttribute('aria-pressed', x === b))});
+$('#simReset').onclick = () => {startVirtual(false); logLine('Banco virtual reiniciado.', 'sys')};
+$('#usbConn').onclick = connect; $('#usbDisc').onclick = () => disconnect(false);
+$('#stopBtn').onclick = () => send('x');
+$$('[data-c]').forEach(b => b.onclick = () => send(b.dataset.c));
+$$('[data-jog]').forEach(b => b.onclick = () => send('m ' + b.dataset.jog));
+$('#vSet').onclick = () => send('v ' + (+$('#vMan').value || 1));
+$$('#testSeg button').forEach(b => b.onclick = () => {$$('#testSeg button').forEach(x => x.setAttribute('aria-pressed', x === b)); $('#testR').hidden = b.dataset.test !== 'r'; $('#testP').hidden = b.dataset.test !== 'p'; updTestCmd()});
+function testCmd() {const r = $('#testSeg [aria-pressed="true"]').dataset.test === 'r';
+  return r ? `r ${+$('#rD').value} ${+$('#rV').value} ${+$('#rP').value} ${Math.round(+$('#rN').value)}` : `p ${+$('#pS').value} ${Math.round(+$('#pN').value)} ${+$('#pP').value} ${+$('#pV').value}`}
+function updTestCmd() {$('#testCmd').textContent = 'Comando: ' + testCmd()}
+['rD', 'rV', 'rP', 'rN', 'pS', 'pN', 'pP', 'pV'].forEach(id => $('#' + id).addEventListener('input', updTestCmd)); updTestCmd();
+$('#testGo').onclick = () => {if ($('#autoRec').checked) {SRC.autoRecNext = true; SRC.stopRecOnFin = true} send(testCmd())};
+$('#fLim').onchange = () => send('f ' + (+$('#fLim').value || 40));
+$('#rmSel').onchange = () => send('rm ' + $('#rmSel').value);
+$('#modoSel').onchange = () => send('modo ' + $('#modoSel').value);
+$('#hzSel').onchange = () => send('o ' + $('#hzSel').value);
+$('#cal1').onclick = () => send('c1 ' + (+$('#calG').value || 500));
+$('#cal2').onclick = () => send('c2 ' + (+$('#calG').value || 500));
+const hist = []; let hi = 0;
+$('#cmdSend').onclick = () => {const v = $('#cmdIn').value.trim(); if (!v) return; send(v); hist.push(v); hi = hist.length; $('#cmdIn').value = ''};
+$('#cmdIn').addEventListener('keydown', e => {if (e.key === 'Enter') {e.preventDefault(); $('#cmdSend').click()}
+  else if (e.key === 'ArrowUp' && hist.length) {e.preventDefault(); hi = Math.max(0, hi - 1); $('#cmdIn').value = hist[hi]}
+  else if (e.key === 'ArrowDown' && hist.length) {e.preventDefault(); hi = Math.min(hist.length, hi + 1); $('#cmdIn').value = hist[hi] || ''}});
+
+/* ================= análisis ================= */
+const DS = []; let curDS = 0;
+function addDataset(name, rows) {DS.push({name, rows: rows.map(r => Object.assign({}, r))}); curDS = DS.length - 1; renderDS(); analyze()}
+function renderDS() {
+  $('#dsList').innerHTML = DS.length ? DS.map((d, i) => `<div class="ds"><input type="radio" name="dsSel" value="${i}" ${i === curDS ? 'checked' : ''} aria-label="Elegir ${esc(d.name)}"><div><b>${esc(d.name)}</b><div class="mono">${d.rows.length} muestras · ${fmt(d.rows[d.rows.length - 1].t - d.rows[0].t, 1)} s</div></div><button data-del="${i}" aria-label="Quitar ${esc(d.name)}">×</button></div>`).join('')
+    : '<p class="small muted">Todavía no hay ensayos. Graba uno en la pestaña Ensayo o abre un CSV.</p>';
+}
+$('#dsList').addEventListener('change', e => {if (e.target.name === 'dsSel') {curDS = +e.target.value; analyze()}});
+$('#dsList').addEventListener('click', e => {const b = e.target.closest('[data-del]'); if (!b) return; DS.splice(+b.dataset.del, 1); curDS = Math.max(0, Math.min(curDS, DS.length - 1)); renderDS(); analyze()});
+$('#csvIn').addEventListener('change', async e => {
+  const f = e.target.files[0]; if (!f) return; const txt = await f.text(); e.target.value = '';
+  const lines = txt.trim().split(/\r?\n/); const hd = lines.shift().split(',').map(s => s.trim()); const ix = k => hd.indexOf(k);
+  if (ix('F_N') < 0 || ix('V_mV') < 0) {toast('El CSV no tiene las columnas F_N y V_mV'); return}
+  const rows = lines.map(l => {const p = l.split(','); const g = k => ix(k) >= 0 ? parseFloat(p[ix(k)]) : NaN; const R = p[ix('R_ohm')];
+    return {t: g('t_s'), z: g('z_mm'), f1: g('F1_N'), f2: g('F2_N'), F: g('F_N'), V: g('V_mV'), R: R === 'inf' ? Infinity : parseFloat(R), ph: g('fase') | 0, cy: g('ciclo') | 0}}).filter(r => Number.isFinite(r.F) && Number.isFinite(r.V));
+  if (rows.length < 10) {toast('El CSV tiene muy pocas filas'); return}
+  addDataset(f.name.replace(/\.csv$/i, ''), rows); toast('CSV cargado: ' + rows.length + ' filas');
+});
+function linfit(x, y) {const n = x.length; let sx = 0, sy = 0, sxx = 0, sxy = 0; for (let i = 0; i < n; i++) {sx += x[i]; sy += y[i]; sxx += x[i] * x[i]; sxy += x[i] * y[i]}
+  const b = (n * sxy - sx * sy) / (n * sxx - sx * sx), a = (sy - b * sx) / n; let ss = 0, st = 0; const my = sy / n; for (let i = 0; i < n; i++) {ss += (y[i] - a - b * x[i]) ** 2; st += (y[i] - my) ** 2}
+  return {a, b, r2: 1 - ss / st}}
+function hysteresis(rows, key = 'V', bins = 25) {
+  const up = rows.filter(r => r.ph === 1), dn = rows.filter(r => r.ph === 3); if (up.length < 5 || dn.length < 5) return NaN;
+  const lo = Math.max(Math.min(...up.map(r => r.F)), Math.min(...dn.map(r => r.F))), hi = Math.min(Math.max(...up.map(r => r.F)), Math.max(...dn.map(r => r.F))); if (!(hi > lo)) return NaN;
+  let mx = 0; for (let k = 0; k < bins; k++) {const a = lo + (hi - lo) * k / bins, b = a + (hi - lo) / bins;
+    const u = up.filter(r => r.F >= a && r.F < b), d = dn.filter(r => r.F >= a && r.F < b); if (u.length && d.length) mx = Math.max(mx, Math.abs(d.reduce((s, r) => s + r[key], 0) / d.length - u.reduce((s, r) => s + r[key], 0) / u.length))}
+  const vs = rows.map(r => r[key]); return 100 * mx / (Math.max(...vs) - Math.min(...vs));
+}
+function repeatability(rows, key = 'V', bins = 20) {
+  const cs = [...new Set(rows.filter(r => r.cy > 0).map(r => r.cy))]; if (cs.length < 2) return NaN;
+  const up = rows.filter(r => r.ph === 1), Fs = up.map(r => r.F).sort((a, b) => a - b); if (Fs.length < 10) return NaN;
+  const lo = Fs[Math.floor(Fs.length * .05)], hi = Fs[Math.floor(Fs.length * .95)]; const sds = [];
+  for (let k = 0; k < bins; k++) {const a = lo + (hi - lo) * k / bins, b = a + (hi - lo) / bins;
+    const means = cs.map(c => {const s = up.filter(r => r.cy === c && r.F >= a && r.F < b); return s.length ? s.reduce((t, r) => t + r[key], 0) / s.length : NaN}).filter(Number.isFinite);
+    if (means.length >= 2) {const m = means.reduce((a, b) => a + b, 0) / means.length; sds.push(Math.sqrt(means.reduce((s, v) => s + (v - m) ** 2, 0) / (means.length - 1)))}}
+  const vs = rows.map(r => r[key]); return sds.length ? 100 * sds.reduce((a, b) => a + b, 0) / sds.length / (Math.max(...vs) - Math.min(...vs)) : NaN;
+}
+function drift(rows) {   // cambio de V durante la pausa con carga más larga (%/min)
+  let best = null, cur = []; rows.forEach(r => {if (r.ph === 2) cur.push(r); else {if (cur.length > (best ? best.length : 0)) best = cur; cur = []}}); if (cur.length > (best ? best.length : 0)) best = cur;
+  if (!best || best.length < 10) return NaN; const dt = best[best.length - 1].t - best[0].t; if (dt < 1) return NaN;
+  const v0 = best.slice(0, 5).reduce((s, r) => s + r.V, 0) / 5, v1 = best.slice(-5).reduce((s, r) => s + r.V, 0) / 5; return 100 * (v1 - v0) / v0 / (dt / 60);
+}
+let AN = null;
+function analyze() {
+  const d = DS[curDS];
+  if (!d) {$('#kpis').innerHTML = ''; $('#aNotes').textContent = ''; ['cA', 'cAT', 'cAD'].forEach(id => {const c = canvasCtx($('#' + id)); if (c) {c.g.fillStyle = CSSV['--ink-2']; c.g.font = '13px Barlow,sans-serif'; c.g.textAlign = 'center'; c.g.fillText('Sin datos', c.w / 2, c.h / 2)}}); return}
+  const rows = d.rows, fmin = +$('#aFmin').value || 0.2, ok = rows.filter(r => r.F > fmin && Number.isFinite(r.R) && r.R > 0 && r.R < 4e6);
+  let pw = null, ln = null;
+  if (ok.length > 10) {const f = linfit(ok.map(r => Math.log(r.F)), ok.map(r => Math.log(r.R))); pw = {A: Math.exp(f.a), n: -f.b, r2: f.r2};
+    ln = linfit(ok.map(r => r.F), ok.map(r => 1e6 / r.R)); ln = {k: ln.b, g0: ln.a, r2: ln.r2}}
+  const Fmax = Math.max(...rows.map(r => r.F)), hy = hysteresis(rows), rp = repeatability(rows), dr = drift(rows);
+  const sens = ln ? ln.k : NaN;
+  AN = {name: d.name, pw, ln, Fmax, hy, rp, dr, n: rows.length, dur: rows[rows.length - 1].t - rows[0].t};
+  $('#kpis').innerHTML = [
+    ['Ajuste de potencia', pw ? `R = ${fmt(pw.A, 0)}·F^−${fmt(pw.n, 3)}` : '—', pw ? 'R² = ' + fmt(pw.r2, 4) : 'pocos puntos'],
+    ['Conductancia lineal', ln ? `${fmt(ln.k, 2)} µS/N` : '—', ln ? `G₀ = ${fmt(ln.g0, 2)} µS · R² = ${fmt(ln.r2, 4)}` : ''],
+    ['Histéresis', Number.isFinite(hy) ? fmt(hy, 1) + ' %' : '—', 'del rango de V, carga contra descarga'],
+    ['Repetibilidad', Number.isFinite(rp) ? fmt(rp, 2) + ' %' : '—', 'desviación entre ciclos (carga)'],
+    ['Deriva en la pausa', Number.isFinite(dr) ? fmt(dr, 2) + ' %/min' : '—', 'cambio de V con carga sostenida'],
+    ['Fuerza máxima', fmt(Fmax, 2) + ' N', `${rows.length} muestras · ${fmt(AN.dur, 1)} s`]
+  ].map(([k, v, s]) => `<div class="kpi">${k}<b>${v}</b><span>${s}</span></div>`).join('');
+  const yk = $('#aY').value, colBy = $('#aCol').value;
+  const ys = rows.map(r => yk === 'V' ? r.V : yk === 'R' ? r.R : 1e6 / r.R), xs = rows.map(r => r.F);
+  const cyc = [CSSV['--accent'], CSSV['--teal'], CSSV['--violet'], CSSV['--warn'], CSSV['--ok'], CSSV['--danger']];
+  const colors = rows.map(r => colBy === 'fase' ? PHCOL(r.ph) : cyc[(Math.max(1, r.cy) - 1) % cyc.length]);
+  const fx = []; const fyv = []; const xMax = Math.max(Fmax, 0.5);
+  for (let i = 0; i <= 120; i++) {const F = Math.max(fmin, xMax * i / 120); fx.push(F);
+    if (yk === 'R') fyv.push(pw ? pw.A * Math.pow(F, -pw.n) : NaN); else if (yk === 'G') fyv.push(ln ? ln.k * F + ln.g0 : NaN);
+    else {const Rf = pw ? pw.A * Math.pow(F, -pw.n) : NaN; fyv.push(3300 * DH.meta.rm / (DH.meta.rm + Rf))}}
+  const okY = ys.filter((v, i) => Number.isFinite(v) && (yk !== 'R' || (v < 4e6 && xs[i] > fmin)));
+  let [y0, y1] = range([okY], 0.06, yk !== 'R'); if (yk === 'V') {y0 = 0; y1 = Math.max(y1, 500)} if (yk === 'R') {y0 = Math.max(10, Math.min(...okY) * 0.7); y1 = Math.max(...okY) * 1.4}
+  plot($('#cA'), {xLo: 0, xHi: xMax * 1.03, yLo: y0, yHi: y1, logY: yk === 'R', xLabel: 'F (N)', yLabel: yk === 'V' ? 'mV' : yk === 'R' ? 'Ω' : 'µS',
+    series: [{points: true, xs, ys, colors, color: CSSV['--accent'], r: 1.6}, {xs: fx, ys: fyv, color: CSSV['--ink'], lw: 2, dash: [6, 4]}]});
+  $('#aTitle').textContent = yk === 'V' ? 'Voltaje del FSR contra fuerza' : yk === 'R' ? 'Resistencia del FSR contra fuerza (log)' : 'Conductancia del FSR contra fuerza';
+  legend($('#lgA'), colBy === 'fase' ? [[CSSV['--accent'], 'cargando'], [CSSV['--teal'], 'descargando'], [CSSV['--ink-3'], 'pausa'], [CSSV['--ink'], 'ajuste']]
+    : [...new Set(rows.map(r => r.cy))].filter(c => c > 0).slice(0, 6).map(c => [cyc[(c - 1) % cyc.length], 'ciclo ' + c]).concat([[CSSV['--ink'], 'ajuste']]));
+  const t0 = rows[0].t, ts = rows.map(r => r.t - t0), vScale = Math.max(...rows.map(r => r.F)) / 3300 || 1;
+  plot($('#cAT'), {xLo: 0, xHi: ts[ts.length - 1] || 1, yLo: 0, yHi: Math.max(Fmax * 1.1, 0.5), xLabel: 't (s)', yLabel: 'N',
+    series: [{xs: ts, ys: rows.map(r => r.F), color: CSSV['--ink'], lw: 1.6}, {xs: ts, ys: rows.map(r => r.V * vScale), color: CSSV['--accent'], lw: 1.2}]});
+  legend($('#lgAT'), [[CSSV['--ink'], 'F (N)'], [CSSV['--accent'], 'V FSR (escalado al eje)']]);
+  const zs = rows.map(r => r.z), [z0, z1] = range([zs], 0.05);
+  plot($('#cAD'), {xLo: z0, xHi: z1, yLo: 0, yHi: Math.max(Fmax * 1.1, 0.5), xLabel: 'z (mm)', yLabel: 'N', series: [{points: true, xs: zs, ys: rows.map(r => r.F), colors: rows.map(r => PHCOL(r.ph)), r: 1.4}]});
+  legend($('#lgAD'), [[CSSV['--accent'], 'cargando'], [CSSV['--teal'], 'descargando']]);
+  $('#aNotes').innerHTML = `<p><b>Cómo leerlo.</b> La curva de potencia R = A·F^−n es la forma típica de un FSR. La conductancia 1/R suele ser casi lineal con la fuerza en el rango útil: su pendiente es la sensibilidad. La histéresis compara la misma fuerza al cargar y al descargar. En la gráfica de fuerza contra profundidad, el área entre carga y descarga es la energía que disipa la silicona.</p>`;
+}
+['aY', 'aFmin', 'aCol'].forEach(id => $('#' + id).addEventListener('change', analyze));
+$('#aPng').onclick = () => {const c = $('#cA'); c.toBlob(b => b && saveBlob(b, `curva-fsr-${stamp()}.png`), 'image/png')};
+$('#aRes').onclick = () => {if (!AN) return; const a = AN;
+  const rows = [['ensayo', a.name], ['muestras', a.n], ['duracion_s', a.dur.toFixed(2)], ['F_max_N', a.Fmax.toFixed(4)], ['potencia_A_ohm', a.pw ? a.pw.A.toFixed(2) : ''], ['potencia_n', a.pw ? a.pw.n.toFixed(4) : ''], ['potencia_R2', a.pw ? a.pw.r2.toFixed(5) : ''],
+    ['conductancia_k_uS_por_N', a.ln ? a.ln.k.toFixed(4) : ''], ['conductancia_G0_uS', a.ln ? a.ln.g0.toFixed(4) : ''], ['conductancia_R2', a.ln ? a.ln.r2.toFixed(5) : ''], ['histeresis_pct', Number.isFinite(a.hy) ? a.hy.toFixed(3) : ''], ['repetibilidad_pct', Number.isFinite(a.rp) ? a.rp.toFixed(3) : ''], ['deriva_pct_min', Number.isFinite(a.dr) ? a.dr.toFixed(3) : '']];
+  saveText('parametro,valor\n' + rows.map(r => r.join(',')).join('\n') + '\n', `resultados-fsr-${stamp()}.csv`)};
+
+/* ensayo de ejemplo: se corre el banco virtual sin dibujar */
+function exampleDataset() {
+  const rows = [], meta = {suma: true, rm: 10000}; let started = false, fin = false;
+  const vb = new VirtualBench(line => {
+    if (line.startsWith('# INICIO')) started = true; if (line.startsWith('# FIN')) fin = true;
+    if (started && line.startsWith('D,')) {const p = line.split(','); const f1 = +p[3], f2 = +p[4], V = +p[5];
+      rows.push({t: +p[1] / 1000, z: +p[2], f1, f2, F: f1 + f2, V, R: V > 1 ? meta.rm * (3300 - V) / V : Infinity, ph: +p[6], cy: +p[7]})}});
+  let t = 0; vb.pending.push({at: 2, fn: () => vb.cmd('e')}, {at: 2.1, fn: () => vb.cmd('h')});
+  const go = () => {if (vb.homed && vb.mode === 'IDLE') vb.cmd('r 3 0.5 2 3'); else vb.pending.push({at: vb.t + 0.2, fn: go})}; vb.pending.push({at: 2.2, fn: go});
+  while (!fin && t < 120) {vb.tick(0.001); t += 0.001}
+  return rows;
+}
+
+/* ================= conexiones: esquemático ================= */
+let CABLES = {};
+(function loadCables() {
+  const f = R.file('fsr/hardware/cables.csv'); if (!f) return;
+  const parse = l => {const out = []; let cur = '', q = false; for (const ch of l) {if (ch === '"') q = !q; else if (ch === ',' && !q) {out.push(cur); cur = ''} else cur += ch} out.push(cur); return out};
+  const L = f.text.trim().split('\n'); L.shift(); L.forEach(l => {const [id, de, a, cal, col, nota] = parse(l); CABLES[id] = {id, de, a, cal, col, nota}});
+  $('#wtable tbody').innerHTML = Object.values(CABLES).map(c => `<tr data-q="${esc((c.id + ' ' + c.de + ' ' + c.a + ' ' + c.nota).toLowerCase())}"><td class="m">${esc(c.id)}</td><td>${esc(c.de)}</td><td>${esc(c.a)}</td><td class="m">${esc(c.cal)}</td><td>${esc(c.col)}</td><td class="small">${esc(c.nota)}</td></tr>`).join('');
+  $('#wq').addEventListener('input', () => {const q = $('#wq').value.trim().toLowerCase(); $$('#wtable tbody tr').forEach(tr => tr.hidden = q && !tr.dataset.q.includes(q))});
+})();
+const pts = a => a.map(p => p.join(',')).join(' ');
+const WIRES = [
+  ['U1', 'cu', [[140, 335], [200, 335]]],
+  ['P1', 'c12', [[790, 92], [790, 165], [720, 165]]], ['P2', 'cg', [[830, 92], [830, 188], [720, 188]]],
+  ['B3', 'c3', [[380, 210], [420, 210], [420, 165], [420, 615]]], ['BG', 'cg', [[380, 235], [400, 235], [400, 188], [400, 672]]],
+  ['L1', 'c3', [[420, 165], [560, 165]]], ['L2', 'cg', [[400, 188], [560, 188]]],
+  ['L3', 'c3', [[540, 165], [540, 295], [560, 295]]], ['L4', 'c3', [[540, 295], [540, 318], [560, 318]]],
+  ['S1', 'cs', [[380, 270], [470, 270], [470, 242], [560, 242]]], ['S2', 'cs', [[380, 292], [480, 292], [480, 264], [560, 264]]], ['S3', 'cs', [[380, 314], [500, 314], [500, 220], [560, 220]]],
+  ['M1', 'cgrn', [[720, 245], [960, 245]]], ['M1', 'cblk', [[720, 268], [960, 268]]], ['M2', 'cblu', [[720, 291], [960, 291]]], ['M2', 'cred', [[720, 314], [960, 314]]],
+  ['H1', 'c3', [[420, 460], [600, 460]]], ['H2', 'cg', [[400, 480], [600, 480]]],
+  ['H3', 'cs', [[380, 350], [520, 350], [520, 500], [600, 500]]], ['H4', 'cs', [[380, 372], [530, 372], [530, 520], [600, 520]]],
+  ['H5', 'c3', [[420, 585], [600, 585]]], ['H6', 'cg', [[400, 605], [600, 605]]],
+  ['H7', 'cs', [[380, 394], [560, 394], [560, 625], [600, 625]]], ['H8', 'cs', [[380, 416], [570, 416], [570, 645], [600, 645]]],
+  ['C1', 'cred', [[740, 460], [860, 460]]], ['C1', 'cblk', [[740, 480], [860, 480]]], ['C1', 'cwht', [[740, 500], [860, 500]]], ['C1', 'cgrn', [[740, 520], [860, 520]]],
+  ['C2', 'cred', [[740, 585], [860, 585]]], ['C2', 'cblk', [[740, 605], [860, 605]]], ['C2', 'cwht', [[740, 625], [860, 625]]], ['C2', 'cgrn', [[740, 645], [860, 645]]],
+  ['F1', 'c3', [[356, 615], [420, 615]]], ['F2', 'cs', [[300, 540], [300, 615], [320, 615]]],
+  ['F3', 'cg', [[300, 615], [260, 615], [260, 628]]], ['F3', 'cg', [[260, 658], [260, 672], [400, 672]]],
+  ['F4', 'cg', [[300, 615], [300, 634]]], ['F4', 'cg', [[300, 640], [300, 672]]]
+];
+const BUSINFO = {B3: {id: 'Riel 3,3 V', de: 'ESP32 3V3', a: 'A4988 VDD · MS1–MS3 · RST+SLP · HX711-1 y -2 VCC · FSR', cal: '24 AWG', col: 'violeta', nota: 'el regulador del ESP32 da hasta ~500 mA: aquí se usan unos 10 mA'},
+  BG: {id: 'Tierra común', de: 'ESP32 GND', a: 'A4988 GND (lógica) · HX711 · Rm · y por el A4988 al GND del adaptador', cal: '24 AWG', col: 'negro', nota: 'sin tierra común el A4988 no entiende STEP/DIR'}};
+function buildSchem() {
+  const box = (x, y, w, h, t, sub) => `<rect class="box" x="${x}" y="${y}" width="${w}" height="${h}" rx="5"/><text class="tt" x="${x + 10}" y="${y + 20}">${t}</text>${sub ? `<text class="t2" x="${x + 10}" y="${y + 36}">${sub}</text>` : ''}`;
+  const pinL = (x, y, t) => `<circle class="dot" cx="${x}" cy="${y}" r="2.6"/><text x="${x + 7}" y="${y + 4}">${t}</text>`;
+  const pinR = (x, y, t) => `<circle class="dot" cx="${x}" cy="${y}" r="2.6"/><text x="${x - 7}" y="${y + 4}" text-anchor="end">${t}</text>`;
+  const ln = (x1, y1, x2, y2) => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="var(--ink)" stroke-width="2"/>`;
+  let s = `<svg viewBox="0 0 1180 700" role="img" aria-label="Esquemático del banco FSR">`;
+  s += box(20, 300, 120, 70, 'Computador', 'USB: 5 V + datos');
+  s += box(200, 150, 180, 390, 'ESP32 DevKit V1', 'solo para este banco');
+  [['3V3', 210], ['GND', 235], ['GPIO25', 270], ['GPIO26', 292], ['GPIO27', 314], ['GPIO16', 350], ['GPIO17', 372], ['GPIO18', 394], ['GPIO19', 416]].forEach(([t, y]) => s += pinR(380, y, t));
+  s += `<circle class="dot" cx="300" cy="540" r="2.6"/><text x="300" y="530" text-anchor="middle">GPIO34 (ADC1)</text>`;
+  s += box(560, 100, 160, 240, 'A4988', '1/16 · Vref 0,8 V');
+  [['VDD', 165], ['GND', 188], ['EN', 220], ['STEP', 242], ['DIR', 264], ['MS1–3', 295], ['RST+SLP', 318]].forEach(([t, y]) => s += pinL(560, y, t));
+  [['VMOT', 165], ['GND', 188], ['1A', 245], ['1B', 268], ['2A', 291], ['2B', 314]].forEach(([t, y]) => s += pinR(720, y, t));
+  s += box(760, 30, 160, 62, 'Adaptador 12 V', '≥ 2 A'); s += `<text x="784" y="86">+</text><text x="824" y="86">−</text>`;
+  s += `<line x1="790" y1="165" x2="790" y2="173" class="w c12"/>${ln(780, 174, 800, 174)}${ln(780, 180, 800, 180)}<line x1="790" y1="181" x2="790" y2="188" class="w cg"/><text x="784" y="152" class="t2" text-anchor="end">C1 100 µF</text>`;
+  s += `<rect class="box" x="960" y="200" width="150" height="150" rx="10"/><circle cx="1035" cy="275" r="40" fill="none" stroke="var(--ink)" stroke-width="1.3"/><text class="tt" x="975" y="222">NEMA 17</text><text class="t2" x="975" y="338">17HS4401S</text>`;
+  [['1A verde', 245], ['1B negro', 268], ['2A azul', 291], ['2B rojo', 314]].forEach(([t, y]) => s += `<text class="t2" x="905" y="${y - 4}" text-anchor="end">${t}</text>`);
+  s += box(600, 405, 140, 125, 'HX711-1', 'celda 1'); [['VCC', 460], ['GND', 480], ['DT', 500], ['SCK', 520]].forEach(([t, y]) => s += pinL(600, y, t)); [['E+', 460], ['E−', 480], ['A−', 500], ['A+', 520]].forEach(([t, y]) => s += pinR(740, y, t));
+  s += box(600, 535, 140, 125, 'HX711-2', 'celda 2'); [['VCC', 585], ['GND', 605], ['DT', 625], ['SCK', 645]].forEach(([t, y]) => s += pinL(600, y, t)); [['E+', 585], ['E−', 605], ['A−', 625], ['A+', 645]].forEach(([t, y]) => s += pinR(740, y, t));
+  [[445, 'Celda 1 · 10 kg', 'lc1'], [570, 'Celda 2 · 10 kg', 'lc2']].forEach(([y, t, id]) => {s += `<rect x="860" y="${y}" width="260" height="90" rx="6" fill="var(--paper)" stroke="var(--ink)" stroke-width="1.3"/><rect x="975" y="${y + 33}" width="30" height="24" rx="3" fill="var(--sheet)" stroke="var(--ink-3)"/><circle cx="890" cy="${y + 45}" r="5" fill="none" stroke="var(--ink-3)"/><circle cx="1090" cy="${y + 45}" r="5" fill="none" stroke="var(--ink-3)"/><text class="tt" x="990" y="${y + 22}" text-anchor="middle">${t}</text><text class="live" id="${id}" x="990" y="${y + 78}" text-anchor="middle">—</text>`});
+  // divisor del FSR
+  s += `<rect x="320" y="605" width="36" height="20" rx="10" fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="1.5"/><text x="338" y="642" text-anchor="middle" class="t2">FSR402</text>`;
+  s += `<rect x="253" y="628" width="14" height="30" fill="var(--sheet)" stroke="var(--ink)" stroke-width="1.3"/><text x="246" y="640" text-anchor="end" class="t2">Rm</text><text id="rmLbl" x="246" y="654" text-anchor="end" class="t2">10 kΩ</text>`;
+  s += `${ln(290, 634, 310, 634)}${ln(290, 640, 310, 640)}<text x="314" y="662" class="t2">100 nF</text>`;
+  s += `<text class="live" id="vLbl" x="292" y="604" text-anchor="end">—</text>`;
+  s += `${ln(388, 680, 412, 680)}${ln(393, 685, 407, 685)}<line x1="400" y1="672" x2="400" y2="680" stroke="var(--wgnd)" stroke-width="2.4"/>`;
+  WIRES.forEach(([id, cls, p]) => {s += `<g class="wire" data-w="${id}"><polyline class="w ${cls}" points="${pts(p)}"/><polyline class="hit" points="${pts(p)}"/></g>`});
+  [[420, 210], [400, 235], [400, 188], [540, 165], [540, 295], [420, 460], [400, 480], [420, 585], [400, 605], [300, 615], [300, 672], [790, 165], [790, 188]].forEach(([x, y]) => s += `<circle class="dot" cx="${x}" cy="${y}" r="3.2"/>`);
+  s += `<text class="live" id="zLbl" x="980" y="372">—</text>`;
+  s += '</svg>';
+  $('#schem').innerHTML = s;
+  $('#schem').addEventListener('click', e => {const g = e.target.closest('.wire'); selWire(g ? g.dataset.w : null)});
+  selWire(null);
+}
+function selWire(id) {
+  const sch = $('#schem'); sch.classList.toggle('sel', !!id); $$('#schem .wire').forEach(g => g.classList.toggle('on', g.dataset.w === id));
+  const c = id ? (CABLES[id] || BUSINFO[id]) : null;
+  $('#wDetail').innerHTML = c ? `<div><h3>${esc(c.id)}</h3><dl class="kv"><dt>Desde</dt><dd>${esc(c.de)}</dd><dt>Hasta</dt><dd>${esc(c.a)}</dd><dt>Calibre</dt><dd>${esc(c.cal)}</dd><dt>Color</dt><dd>${esc(c.col)}</dd></dl></div><div class="small">${esc(c.nota || '')}<br><button class="btn sm" id="wClr" style="margin-top:8px">Ver todo</button></div>`
+    : `<p class="small muted">Haz clic en un cable para resaltarlo. Los rieles de 3,3 V y GND reparten la alimentación a todo lo de lógica.</p>`;
+  const b = $('#wClr'); if (b) b.onclick = () => selWire(null);
+}
+function updLiveSchem() {
+  if ($('#p-conexiones').hidden) return; const L = DH.last;
+  const t = (id, v) => {const el = document.getElementById(id); if (el) el.textContent = v};
+  t('lc1', L ? 'F1 = ' + fmt(L.f1, 2) + ' N' : '—'); t('lc2', L ? 'F2 = ' + fmt(L.f2, 2) + ' N' : '—');
+  t('vLbl', L ? fmt(L.V, 0) + ' mV' : '—'); t('zLbl', L ? 'z = ' + fmt(L.z, 2) + ' mm' : '—'); t('rmLbl', fmt(DH.meta.rm / 1000, 1) + ' kΩ');
+}
+
+/* ================= elegir Rm ================= */
+function drawRm() {
+  const f1 = Math.max(0.05, +$('#rmF1').value || 0.5), f2 = Math.max(f1 * 1.5, +$('#rmF2').value || 30);
+  const RMS = [1000, 3300, 10000, 47000], cols = [CSSV['--violet'], CSSV['--teal'], CSSV['--accent'], CSSV['--warn']];
+  const Fx = []; for (let i = 0; i <= 200; i++) Fx.push(f2 * 1.3 * i / 200);
+  const Rof = F => fsrR(F * fsrFraction(1.5));
+  plot($('#cRm'), {xLo: 0, xHi: f2 * 1.3, yLo: 0, yHi: 3300, xLabel: 'F (N)', yLabel: 'mV', refs: [{y: 3100, color: CSSV['--warn'], label: 'saturación'}],
+    series: RMS.map((rm, i) => ({xs: Fx, ys: Fx.map(F => 3300 * rm / (rm + Rof(F))), color: cols[i], lw: rm === DH.meta.rm ? 3 : 1.6}))});
+  legend($('#lgRm'), RMS.map((rm, i) => [cols[i], fmt(rm / 1000, 1) + ' kΩ']));
+  const ra = Rof(f1), rb = Rof(f2), opt = Math.sqrt(ra * rb);
+  const E12 = [1, 1.2, 1.5, 1.8, 2.2, 2.7, 3.3, 3.9, 4.7, 5.6, 6.8, 8.2]; let best = 1000, be = Infinity;
+  for (let dec = 100; dec <= 1e6; dec *= 10) E12.forEach(m => {const v = m * dec, e = Math.abs(Math.log(v / opt)); if (e < be) {be = e; best = v}});
+  const vA = 3300 * best / (best + ra), vB = 3300 * best / (best + rb);
+  $('#rmAdvice').innerHTML = `<p>Con el modelo actual, el FSR pasa de <b>${fmtR(ra)}</b> a ${fmt(f1, 1)} N hasta <b>${fmtR(rb)}</b> a ${fmt(f2, 0)} N. La Rm que reparte mejor ese rango es √(R<sub>a</sub>·R<sub>b</sub>) ≈ <b>${fmtR(opt)}</b>; el valor comercial más cercano es <b>${fmtR(best)}</b>, que da de ${fmt(vA, 0)} a ${fmt(vB, 0)} mV.</p>`;
+}
+['rmF1', 'rmF2'].forEach(id => $('#' + id).addEventListener('input', drawRm));
+
+/* ================= modelo: curvas teóricas ================= */
+function drawModel() {
+  const ds = [], Fv = []; for (let i = 0; i <= 120; i++) {const d = 8 * i / 120; ds.push(d); Fv.push(silicone(d))}
+  const Feq = Fv.map(F => F * (1 - P.g1));
+  plot($('#cM1'), {xLo: 0, xHi: 8, yLo: 0, yHi: Math.max(...Fv) * 1.1 || 1, xLabel: 'profundidad d (mm)', yLabel: 'N', refs: [{y: 98.07, color: CSSV['--danger'], label: 'capacidad de una celda'}],
+    series: [{xs: ds, ys: Fv, color: CSSV['--ink'], lw: 2}, {xs: ds, ys: Feq, color: CSSV['--accent'], lw: 1.6, dash: [6, 4]}, {xs: ds, ys: ds.map(d => silicone(d) * fsrFraction(d)), color: CSSV['--teal'], lw: 1.6}]});
+  legend($('#lgM1'), [[CSSV['--ink'], 'F instantánea'], [CSSV['--accent'], 'F después de relajar'], [CSSV['--teal'], 'F que pasa por el FSR']]);
+  const Fx = [], Rv = []; for (let i = 0; i <= 160; i++) {const F = 0.05 * Math.pow(10, 3 * i / 160); Fx.push(F); Rv.push(fsrR(F))}
+  plot($('#cM2'), {xLo: 0, xHi: 20, yLo: 100, yHi: 6e6, logY: true, xLabel: 'F sobre el FSR (N)', yLabel: 'Ω', series: [{xs: Fx, ys: Rv, color: CSSV['--accent'], lw: 2}]});
+  legend($('#lgM2'), [[CSSV['--accent'], `R = ${fmt(P.R1, 0)}·F^−${fmt(P.n, 2)} + ${fmt(P.Rsat, 0)} Ω`]]);
+}
+
+/* ================= montaje ================= */
+function buildMontaje() {
+  const imgs = [['fsr/fotos/prensa.jpg', 'La prensa: tornillo, brazo rosado con el punzón, plataforma gris sobre las celdas, NEMA 17 abajo.'], ['fsr/fotos/cupula-silicona.jpg', 'La cúpula de silicona con el FSR402 adentro (aquí montada en el brazo robótico).']];
+  $('#photos').innerHTML = imgs.map(([p, c]) => R.IMAGES[p] ? `<figure><img src="${R.IMAGES[p]}" alt="${esc(c)}"><figcaption>${esc(c)}</figcaption></figure>` : '').join('') || '<p class="small muted">Las fotos están en fsr/fotos/ del repositorio.</p>';
+  const md = (id, path) => {const f = R.file(path); const el = $(id); if (!f) {el.hidden = true; return} el.innerHTML = R.mdRender(f.text.replace(/!\[[^\]]*\]\([^)]*\)\n?/g, ''), path, {taskKey: 'fsrCk'}); R.bindTasks(el, 'fsrCk')};
+  md('#docMontaje', 'fsr/hardware/montaje.md'); md('#docConex', 'fsr/hardware/conexiones.md'); md('#docCal', 'fsr/hardware/calibracion.md');
+}
+
+/* ================= pestañas y ciclo principal ================= */
+const TABS = ['ensayo', 'analisis', 'conexiones', 'montaje', 'modelo', 'codigo'];
+function setTab(t) {
+  TABS.forEach(k => {$('#t-' + k).setAttribute('aria-selected', k === t); $('#p-' + k).hidden = k !== t});
+  try {localStorage.setItem('fsrTab', t)} catch (e) {}
+  if (history.replaceState) history.replaceState(null, '', '#' + t);
+  requestAnimationFrame(() => {if (t === 'analisis') analyze(); if (t === 'modelo') drawModel(); if (t === 'conexiones') {drawRm(); updLiveSchem()}});
+}
+TABS.forEach(k => $('#t-' + k).addEventListener('click', () => setTab(k)));
+$('.tabs').addEventListener('keydown', e => {const i = TABS.findIndex(k => $('#t-' + k) === document.activeElement); if (i < 0) return;
+  if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {const j = (i + (e.key === 'ArrowRight' ? 1 : TABS.length - 1)) % TABS.length; setTab(TABS[j]); $('#t-' + TABS[j]).focus()}});
+window.addEventListener('hashchange', () => {const h = location.hash.slice(1); if (TABS.includes(h)) setTab(h)});
+
+let lastT = performance.now(), acc = 0;
+function frame(now) {
+  const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
+  if (SRC.kind === 'virtual' && SRC.vb) {const n = Math.round(dt * 1000 * SRC.speed); for (let i = 0; i < n; i++) SRC.vb.tick(0.001)}
+  acc += dt;
+  if (!$('#p-ensayo').hidden) {drawPress(); if (acc > 1 / 15 && !DH.frozen) drawLive(); else if (DH.frozen && acc > 0.5) drawLive()}
+  if (acc > 1 / 15) {acc = 0; updReadouts()}
+  requestAnimationFrame(frame);
+}
+let rz = 0; window.addEventListener('resize', () => {clearTimeout(rz); rz = setTimeout(() => {if (!$('#p-analisis').hidden) analyze(); if (!$('#p-modelo').hidden) drawModel(); if (!$('#p-conexiones').hidden) drawRm(); if (DH.frozen) drawLive()}, 150)});
+
+/* ================= arranque ================= */
+const VIEW = R.initViewer({storeKey: 'fsrFile', defaultFile: 'fsr/firmware/fsr_ensayo/fsr_ensayo.ino', order: ['fsr/firmware', 'fsr/hardware', 'fsr/analisis', 'fsr', 'web', 'tools', '.github'], copyText, saveText});
+buildSchem(); buildMontaje();
+document.addEventListener('click', e => {const a = e.target.closest('a[data-open]'); if (!a || a.closest('#cDoc')) return; e.preventDefault(); setTab('codigo'); VIEW.openFile(a.dataset.open)});
+addDataset('Ejemplo · banco virtual (Dragon Skin 20, Rm 10 kΩ)', exampleDataset());
+renderDS();
+startVirtual(true);
+let initTab = 'ensayo'; try {const h = location.hash.slice(1); if (TABS.includes(h)) initTab = h; else {const s = localStorage.getItem('fsrTab'); if (TABS.includes(s)) initTab = s}} catch (e) {}
+setTab(initTab);
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

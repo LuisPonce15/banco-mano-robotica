@@ -1,0 +1,27 @@
+id,desde,hasta,calibre,color,nota
+P1,Adaptador 12 V (+),A4988 VMOT y C1 (+),20 AWG,rojo,C1 100 µF lo más cerca del módulo
+P2,Adaptador 12 V (−),A4988 GND (potencia) y C1 (−),20 AWG,negro,
+L1,ESP32 3V3,A4988 VDD,24 AWG,violeta,
+L2,ESP32 GND,A4988 GND (lógica),24 AWG,negro,une la tierra del ESP32 con la de 12 V
+L3,A4988 VDD,"MS1, MS2, MS3",24 AWG,violeta,1/16 de paso
+L4,A4988 VDD,RST + SLP (puenteados),24 AWG,violeta,sin esto el driver queda dormido
+S1,ESP32 GPIO25,A4988 STEP,24 AWG,blanco,
+S2,ESP32 GPIO26,A4988 DIR,24 AWG,blanco,
+S3,ESP32 GPIO27,A4988 EN,24 AWG,blanco,LOW = motor con fuerza
+M1,A4988 1A / 1B,Motor verde / negro,original,verde / negro,bobina 1
+M2,A4988 2A / 2B,Motor azul / rojo,original,azul / rojo,bobina 2
+H1,ESP32 3V3,HX711-1 VCC (y VDD),24 AWG,violeta,
+H2,ESP32 GND,HX711-1 GND,24 AWG,negro,
+H3,ESP32 GPIO16,HX711-1 DT,24 AWG,amarillo,
+H4,ESP32 GPIO17,HX711-1 SCK,24 AWG,azul,
+H5,ESP32 3V3,HX711-2 VCC (y VDD),24 AWG,violeta,
+H6,ESP32 GND,HX711-2 GND,24 AWG,negro,
+H7,ESP32 GPIO18,HX711-2 DT,24 AWG,amarillo,
+H8,ESP32 GPIO19,HX711-2 SCK,24 AWG,azul,
+C1,Celda 1 (rojo / negro / blanco / verde),HX711-1 E+ / E− / A− / A+,original,4 hilos,trenzar y alejar del motor
+C2,Celda 2 (rojo / negro / blanco / verde),HX711-2 E+ / E− / A− / A+,original,4 hilos,trenzar y alejar del motor
+F1,ESP32 3V3,FSR402 pata 1,24 AWG,rojo,
+F2,FSR402 pata 2,ESP32 GPIO34 (nodo),24 AWG,blanco,
+F3,Nodo GPIO34,Rm 10 kΩ → GND,—,—,resistencia del divisor
+F4,Nodo GPIO34,100 nF → GND,—,—,opcional
+U1,ESP32 USB,Computador,cable USB de datos,—,alimenta el ESP32 y lleva los datos

@@ -8,7 +8,15 @@ Proyecto de Desarrollo Profesional · Universidad de los Andes · Luis Felipe Po
 
 **▶ Página interactiva: https://luisponce15.github.io/banco-mano-robotica/**
 
-Esa página reúne todo el proyecto:
+El repositorio tiene dos bancos independientes, cada uno con su propio ESP32:
+
+| Banco | Qué hace | Página | Carpeta |
+|---|---|---|---|
+| **E-01 · dedo** | Dos ejes NEMA 17 sincronizados, servos DS3240/DS3235 e INA219 | [abrir](https://luisponce15.github.io/banco-mano-robotica/) | `firmware/`, `hardware/` |
+| **FSR · prensa** | Caracteriza un FSR402 dentro de silicona con una prensa de tornillo y 2 celdas de carga (HX711) | [abrir](https://luisponce15.github.io/banco-mano-robotica/fsr/) | [`fsr/`](fsr/README.md) |
+
+La página del banco E-01 reúne:
+
 
 | Pestaña | Qué tiene |
 |---|---|
@@ -37,8 +45,11 @@ banco-mano-robotica/
 │   ├── ina219.md           Direcciones I2C, rango del shunt y código
 │   ├── seguridad.md        Orden de encendido/apagado, USB y energización por etapas
 │   └── depuracion.md       Bitácora de fallas encontradas y cómo se resolvieron
-├── web/index.src.html      Fuente de la página interactiva
-├── tools/build_site.py     Genera docs/index.html e incrusta el código del repo
+├── fsr/                    Banco FSR: firmware, conexiones, montaje, calibración, análisis y fotos
+├── web/index.src.html      Fuente de la página del banco E-01
+├── web/fsr.src.html        Fuente de la página del banco FSR
+├── web/comun/repo.js       Visor de código y Markdown compartido
+├── tools/build_site.py     Genera docs/ e incrusta el código del repo en cada página
 ├── docs/                   Sitio publicado en GitHub Pages (generado, no editar a mano)
 └── .github/workflows/      CI: compila el firmware y revisa que el sitio esté al día
 ```
@@ -82,7 +93,7 @@ banco-mano-robotica/
 
 ## Regenerar la página
 
-La página publicada (`docs/index.html`) se genera a partir de `web/index.src.html` y de los archivos del repositorio, para que la pestaña **Código** siempre muestre la versión actual:
+Las páginas publicadas (`docs/index.html` y `docs/fsr/index.html`) se generan a partir de `web/*.src.html` y de los archivos del repositorio, para que la pestaña **Código** siempre muestre la versión actual:
 
 ```bash
 python3 tools/build_site.py

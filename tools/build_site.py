@@ -1,38 +1,63 @@
 #!/usr/bin/env python3
-"""Genera docs/index.html (GitHub Pages) a partir de web/index.src.html.
+"""Genera las páginas de GitHub Pages a partir de web/*.src.html.
 
-Incrusta en la página todos los archivos de texto del repositorio para que la
-pestaña «Código» los muestre sin depender de la red.
+  web/index.src.html  →  docs/index.html       (banco E-01, dedo)
+  web/fsr.src.html    →  docs/fsr/index.html   (banco FSR)
+
+En cada página incrusta los archivos de texto del repositorio que le
+corresponden (pestaña «Código»), las fotos (data: URI) y los scripts
+compartidos de web/comun/, para que funcione sin depender de la red.
 
 Uso:
-    python3 tools/build_site.py           # genera docs/index.html
-    python3 tools/build_site.py --check   # falla si docs/index.html no está al día (CI)
+    python3 tools/build_site.py           # genera las páginas
+    python3 tools/build_site.py --check   # falla si alguna no está al día (CI)
 """
+import base64
 import json
 import pathlib
+import re
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-SRC = ROOT / "web" / "index.src.html"
-OUT = ROOT / "docs" / "index.html"
-MARK = "<!--@REPO_FILES@-->"
 
-TEXT_EXT = {".ino", ".h", ".cpp", ".c", ".md", ".csv", ".py", ".yml", ".yaml", ".json", ".txt"}
+TEXT_EXT = {".ino", ".h", ".cpp", ".c", ".md", ".csv", ".py", ".yml", ".yaml", ".json", ".txt", ".js"}
 TEXT_NAMES = {"LICENSE", ".gitignore"}
 SKIP_DIRS = {".git", "docs", "node_modules", "build", "__pycache__", ".pio", ".vscode"}
-# La propia página es muy grande para incrustarla dentro de sí misma:
-# la pestaña «Código» la descarga de GitHub cuando se abre.
-LAZY = {"web/index.src.html"}
+IMG_EXT = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".svg": "image/svg+xml"}
+
+PAGES = [
+    {
+        "src": "web/index.src.html",
+        "out": "docs/index.html",
+        # todo menos el banco FSR
+        "include": lambda p: not p.startswith("fsr/") and p not in ("web/fsr.src.html",) and not p.startswith("web/comun/"),
+        "lazy": {"web/index.src.html"},
+        "images": [],
+    },
+    {
+        "src": "web/fsr.src.html",
+        "out": "docs/fsr/index.html",
+        "include": lambda p: p.startswith("fsr/") or p.startswith("web/comun/") or p.startswith(".github/")
+        or p in ("tools/build_site.py", "web/fsr.src.html"),
+        "lazy": {"web/fsr.src.html"},
+        "images": ["fsr/fotos/prensa.jpg", "fsr/fotos/cupula-silicona.jpg"],
+    },
+]
 
 
-def repo_files():
-    files = []
+def all_files():
     for p in sorted(ROOT.rglob("*")):
         rel = p.relative_to(ROOT)
-        if not p.is_file() or any(part in SKIP_DIRS for part in rel.parts):
+        if p.is_file() and not any(part in SKIP_DIRS for part in rel.parts):
+            yield rel.as_posix(), p
+
+
+def repo_files(page):
+    files = []
+    for key, p in all_files():
+        if not page["include"](key):
             continue
-        key = rel.as_posix()
-        if key in LAZY:
+        if key in page["lazy"]:
             files.append({"path": key, "lazy": True, "size": p.stat().st_size})
             continue
         if p.suffix.lower() not in TEXT_EXT and p.name not in TEXT_NAMES:
@@ -42,28 +67,55 @@ def repo_files():
     return files
 
 
-def build():
-    src = SRC.read_text(encoding="utf-8")
-    if src.count(MARK) != 1:
-        sys.exit(f"{SRC}: falta el marcador {MARK} (o está repetido)")
-    data = json.dumps(repo_files(), ensure_ascii=False, separators=(",", ":"))
-    data = data.replace("</", "<\\/")  # que ningún archivo cierre el <script> antes de tiempo
-    block = f'<script type="application/json" id="repoFiles">{data}</script>'
-    return src.replace(MARK, block)
+def script_json(id_, data):
+    s = json.dumps(data, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
+    return f'<script type="application/json" id="{id_}">{s}</script>'
+
+
+def build(page):
+    src = (ROOT / page["src"]).read_text(encoding="utf-8")
+    if src.count("<!--@REPO_FILES@-->") != 1:
+        sys.exit(f"{page['src']}: falta el marcador <!--@REPO_FILES@--> (o está repetido)")
+
+    def images():
+        out = {}
+        for rel in page["images"]:
+            p = ROOT / rel
+            out[rel] = f"data:{IMG_EXT[p.suffix.lower()]};base64," + base64.b64encode(p.read_bytes()).decode()
+        return out
+
+    def repl(m):
+        tag = m.group(1)
+        if tag == "REPO_FILES":
+            return script_json("repoFiles", repo_files(page))
+        if tag == "REPO_IMAGES":
+            return script_json("repoImages", images())
+        code = (ROOT / tag.split(" ", 1)[1]).read_text(encoding="utf-8")
+        return "<script>\n" + code.replace("</script", "<\\/script") + "\n</script>"
+
+    # Una sola pasada: el texto incrustado (por ejemplo este mismo script) puede
+    # contener los marcadores y no debe volver a reemplazarse.
+    return re.sub(r"<!--@(REPO_FILES|REPO_IMAGES|INCLUDE [\w./-]+)@-->", repl, src)
 
 
 def main():
-    html = build()
-    if "--check" in sys.argv:
-        current = OUT.read_text(encoding="utf-8") if OUT.exists() else ""
-        if current != html:
-            sys.exit("docs/index.html no está al día. Corre: python3 tools/build_site.py")
-        print("docs/index.html está al día")
-        return
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    (OUT.parent / ".nojekyll").touch()
-    OUT.write_text(html, encoding="utf-8")
-    print(f"Escrito {OUT.relative_to(ROOT)} ({len(html) // 1024} KB)")
+    check = "--check" in sys.argv
+    stale = []
+    for page in PAGES:
+        html = build(page)
+        out = ROOT / page["out"]
+        if check:
+            if not out.exists() or out.read_text(encoding="utf-8") != html:
+                stale.append(page["out"])
+            continue
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(html, encoding="utf-8")
+        print(f"Escrito {page['out']} ({len(html) // 1024} KB)")
+    (ROOT / "docs" / ".nojekyll").touch()
+    if check:
+        if stale:
+            sys.exit("No están al día: " + ", ".join(stale) + ". Corre: python3 tools/build_site.py")
+        print("Las páginas están al día")
 
 
 if __name__ == "__main__":

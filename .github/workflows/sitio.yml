@@ -2,7 +2,7 @@ name: Sitio
 
 on:
   push:
-    paths: ["web/**", "docs/**", "firmware/**", "hardware/**", "tools/**", "*.md", ".github/**"]
+    paths: ["web/**", "docs/**", "firmware/**", "hardware/**", "fsr/**", "tools/**", "*.md", ".github/**"]
   pull_request:
   workflow_dispatch:
 
