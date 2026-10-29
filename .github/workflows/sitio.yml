@@ -1,0 +1,18 @@
+name: Sitio
+
+on:
+  push:
+    paths: ["web/**", "docs/**", "firmware/**", "hardware/**", "tools/**", "*.md", ".github/**"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  al-dia:
+    name: docs/index.html está al día
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python3 tools/build_site.py --check

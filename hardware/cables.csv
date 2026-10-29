@@ -1,0 +1,44 @@
+id,desde,hasta,calibre,color,corriente_max,terminal
+C01,X2 L (después de S1),PS1 L,18 AWG,marrón,3 A,"faston hembra aislado 6,3 mm / horquilla M3,5"
+C02,X2 N (después de S1),PS1 N,18 AWG,azul,3 A,"faston 6,3 mm / horquilla M3,5"
+C03,X2 PE,PS1 FG ⏚,18 AWG,verde-amarillo,—,"faston 6,3 mm / horquilla M3,5"
+C04,PS1 FG ⏚,Base metálica (si aplica),18 AWG,verde-amarillo,—,ojal M4 + arandela estrella
+C10,PS1 +V,S2 · borne 1,18 AWG,rojo,10 A,horquilla 6006 en ambos extremos
+C12,S2 · borne 2,W1-1,18 AWG,rojo,10 A,pelado 11 mm
+C13,PS1 −V,W2-1,18 AWG,negro,10 A,"horquilla M3,5 / pelado"
+C20,W1-2,DRV-A VMOT,20 AWG,rojo,"1,5 A",soldado en placa
+C21,W2-2,DRV-A GND (potencia),20 AWG,negro,"1,5 A",soldado en placa
+C22,W1-3,DRV-B VMOT,20 AWG,rojo,"1,5 A",soldado en placa
+C23,W2-3,DRV-B GND (potencia),20 AWG,negro,"1,5 A",soldado en placa
+C24,W1-4,U1 IN+,18 AWG,rojo,3 A,bornera del módulo
+C25,W2-4,U1 IN−,18 AWG,negro,3 A,bornera del módulo
+C26,W1-5,U2 IN+,22 AWG,rojo,"0,3 A",soldado / bornera
+C27,W2-5,U2 IN−,22 AWG,negro,"0,3 A",soldado / bornera
+C30,U1 OUT+,W3-1,16 AWG,naranja (o rojo + cinta),10 A,bornera / pelado 11 mm
+C31,U1 OUT−,W4-1,16 AWG,negro,10 A,bornera / pelado 11 mm
+C32,W3-2,INA1 VIN+,20 AWG,rojo,3 A,extensión con conector servo
+C33,SV1 − (café),W4-2,20 AWG,negro,3 A,extensión con conector servo
+C34,W3-3,INA2 VIN+,20 AWG,rojo,3 A,extensión con conector servo
+C35,SV2 − (café),W4-3,20 AWG,negro,3 A,extensión con conector servo
+C60,INA1 VIN−,SV1 + (rojo) · DS3240,20 AWG,rojo,3 A,tornillo del INA / conector servo
+C61,INA2 VIN−,SV2 + (rojo) · DS3235,20 AWG,rojo,3 A,tornillo del INA / conector servo
+C62,"ESP32 3V3, GND, GPIO21, GPIO22",INA1 → INA2 (en cadena),24 AWG ×4,4 hilos trenzados,mA,dupont / header
+C36,W3-4,C3 +,20 AWG,rojo,pico,soldado + termoencogible
+C37,W4-4,C3 −,20 AWG,negro,pico,soldado + termoencogible
+C38,W4-5,W5-3,20 AWG,negro,"<0,1 A","pelado ambos lados, corto"
+C40,U2 OUT+,ESP32 VIN,22 AWG,amarillo,"0,5 A",soldado en placa
+C41,U2 OUT−,W5-1,22 AWG,negro,"0,5 A",pelado 11 mm
+C42,GND_PL (placa),W5-2,22 AWG,negro,"0,5 A",soldado / pelado
+C43,ESP32 3V3,"VDD DRV-A/B, MS1–MS3, VCC INA1/INA2",24 AWG,violeta,<50 mA,alambre en placa
+C44,W5-4,FC-A COM,24 AWG,negro (trenzado con C46),mA,"faston 2,8 mm / soldado"
+C45,W5-5,FC-B COM,24 AWG,negro (trenzado con C47),mA,"faston 2,8 mm / soldado"
+C46,FC-A NC,ESP32 GPIO18,24 AWG,blanco,mA,dupont / soldado
+C47,FC-B NC,ESP32 GPIO19,24 AWG,blanco,mA,dupont / soldado
+C48,5 V placa (VIN del ESP32),Ventilador +,24 AWG,amarillo / rojo,"0,1 A",soldado en placa
+C49,Ventilador −,GND_PL,24 AWG,negro,"0,1 A",soldado en placa
+C54,ESP32 GPIO23,BTN · pestaña NC,24 AWG,blanco,mA,"dupont / faston 4,8 mm"
+C55,BTN · pestaña C (COM),GND_PL,24 AWG,negro,mA,"faston 4,8 mm / dupont"
+C50,DRV-A 1A 1B 2A 2B,M1,original,4 hilos del motor,"1,5 A",JST-XH 4 p / soldado
+C51,DRV-B 1A 1B 2A 2B,M2,original,4 hilos del motor,"1,5 A",JST-XH 4 p / soldado
+C52,ESP32 GPIO16,SV1 S,24 AWG,señal,mA,dupont
+C53,ESP32 GPIO17,SV2 S,24 AWG,señal,mA,dupont

@@ -1,0 +1,9 @@
+.DS_Store
+*.bin
+*.elf
+*.map
+build/
+.vscode/
+.pio/
+__pycache__/
+node_modules/
