@@ -1,6 +1,6 @@
 # Firmware
 
-Los dos programas son para **ESP32 DevKit V1** con el paquete **esp32 by Espressif** (se probó con la versión 2.x; se recomienda 3.x). Placa en Arduino IDE: **ESP32 Dev Module**.
+Los dos programas son para **ESP32 DevKit V1** con el paquete **esp32 by Espressif**. `banco_prueba` funciona con 2.x y 3.x; `banco_fase1` necesita **3.x** (lo piden sus librerías). La compilación automática (pestaña *Actions*) revisa las dos combinaciones en cada cambio. Placa en Arduino IDE: **ESP32 Dev Module**.
 
 | Sketch | Para qué | Librerías |
 |---|---|---|

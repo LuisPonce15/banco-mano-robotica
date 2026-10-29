@@ -1,5 +1,7 @@
 # Banco E-01 · banco de pruebas para mano robótica
 
+[![Firmware](https://github.com/LuisPonce15/banco-mano-robotica/actions/workflows/firmware.yml/badge.svg)](https://github.com/LuisPonce15/banco-mano-robotica/actions/workflows/firmware.yml) [![Sitio](https://github.com/LuisPonce15/banco-mano-robotica/actions/workflows/sitio.yml/badge.svg)](https://github.com/LuisPonce15/banco-mano-robotica/actions/workflows/sitio.yml)
+
 Banco de pruebas de dos ejes lineales sincronizados (NEMA 17 + varilla roscada T8) para caracterizar un dedo robótico de 2 GDL accionado por tendón. Un servo **DS3240** flexiona el dedo y un servo **DS3235** lo desvía lateralmente. Un **INA219** mide la corriente de cada servo. Todo se controla con un **ESP32** y se alimenta de la pared (110 V) con una fuente de 12 V.
 
 Proyecto de Desarrollo Profesional · Universidad de los Andes · Luis Felipe Ponce.
@@ -68,6 +70,7 @@ banco-mano-robotica/
 
 - [x] Montaje mecánico y eléctrico
 - [x] `banco_prueba` compila y corre en el ESP32
+- [x] `banco_fase1` compila (paquete esp32 3.x) en la integración continua
 - [x] Finales de carrera FC-A, FC-B y botón BTN verificados
 - [x] VMOT, VDD, Vref y SLP/RST de los drivers verificados
 - [ ] Motores con fuerza: EN del driver no sigue a GPIO27 (ver [`hardware/depuracion.md`](hardware/depuracion.md))

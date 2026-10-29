@@ -274,6 +274,7 @@ a.btn{text-decoration:none;color:inherit;display:inline-flex;align-items:center}
 .code .cl.cur{background:var(--accent-bg)}
 .code .cl.cur .ln{color:var(--accent);font-weight:500}
 .mdview{border:1px solid var(--rule);border-radius:4px;padding:18px 22px;max-height:72vh;overflow:auto;display:flex;flex-direction:column;gap:10px;font-size:14.5px}
+.mdview>*{flex-shrink:0}
 .mdview h1{font-size:1.6rem}.mdview h2{font-size:1.3rem;margin-top:8px;padding-bottom:4px;border-bottom:1px solid var(--rule)}.mdview h3{font-size:1.1rem;margin-top:4px}
 .mdview ul,.mdview ol{margin:0;padding-left:1.4em;display:flex;flex-direction:column;gap:3px}
 .mdview li.task{list-style:none;margin-left:-1.2em}
@@ -1270,7 +1271,7 @@ x</pre><button data-copy>Copiar</button></div>
             <summary><span class="gn">9</span><div><h3>Fase 1: ejes por WiFi con homing</h3><span class="gtag">firmware/banco_fase1</span></div><label class="check" onclick="event.stopPropagation()"><input type="checkbox" data-gk="f1"> Hecho</label></summary>
             <div class="gbody">
               <ol>
-                <li>Instala las librerías: <b>FastAccelStepper</b>, <b>ESP Async WebServer</b>, <b>Async TCP</b> y <b>ArduinoJson</b> (versión 7).</li>
+                <li>Necesita el paquete esp32 <b>3.x</b>. Instala las librerías: <b>FastAccelStepper</b>, <b>ESP Async WebServer</b>, <b>Async TCP</b> y <b>ArduinoJson</b> (versión 7).</li>
                 <li>Pon en el código lo que mediste: <code>LEAD_MM</code>, <code>INVERT_A</code>, <code>INVERT_B</code> y <code>STROKE_MM</code>.</li>
                 <li>Súbelo, conéctate a la red <b>BancoE01</b> (clave <code>mano2026</code>) y abre <b>http://192.168.4.1</b>.</li>
                 <li>Habilita, haz <b>Homing</b> y mueve con el deslizador. Prueba el BTN: debe detener todo y pedir rearmar.</li>
@@ -2430,7 +2431,11 @@ function highlight(src,lang){
 function outline(text,lang){
   const L=text.split('\n'),out=[];
   if(lang==='cpp'||lang==='js'){
+    let raw=null;
     L.forEach((ln,i)=>{
+      if(lang==='cpp'){if(raw!==null){if(ln.includes(')'+raw+'"'))raw=null;return}
+        const r=ln.match(/R"(\w*)\(/);if(r&&!ln.includes(')'+r[1]+'"',r.index+3)){raw=r[1]}
+        if(/,\s*$/.test(ln)&&!/^\s/.test(ln)&&/\(/.test(ln)&&!/[;=]/.test(ln))ln=ln+' '+(L[i+1]||'').trim()}
       let m=ln.match(/^\s*\/\/\s*-{3,}\s*(.+?)\s*-{3,}\s*$/);if(m){out.push({n:i+1,t:'§ '+m[1],sec:1});return}
       if(lang==='cpp'){m=ln.match(/^(?!\s*(?:if|for|while|switch|return|else|case|do)\b)[A-Za-z_][\w\s\*&:<>,]*?\b([A-Za-z_]\w*)\s*\(([^;]*)$/);
         if(m&&!/^\s/.test(ln)&&(/\{\s*(\/\/.*)?$/.test(ln)||/^\s*\{/.test(L[i+1]||'')||/\)\s*\{?\s*$/.test(ln)&&!/;\s*$/.test(ln))&&!/^(?:const|static const)\b.*=/.test(ln))out.push({n:i+1,t:m[1]+'()'})}
@@ -2446,12 +2451,14 @@ function outline(text,lang){
 /* ---------------- Markdown mínimo ---------------- */
 function mdInline(s,base){
   const codes=[];s=esc(s).replace(/`([^`]+)`/g,(_,c)=>{codes.push(c);return '\u0000'+(codes.length-1)+'\u0000'});
+  s=s.replace(/!\[([^\]]*)\]\((https:[^)\s]+)\)/g,(_,a,u)=>`<img src="${u}" alt="${a}" style="height:20px;vertical-align:middle" onerror="this.replaceWith(document.createTextNode(this.alt))">`);
   s=s.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g,(_,t,u)=>{
     if(/^(https?:|mailto:)/.test(u))return `<a href="${u}" target="_blank" rel="noopener">${t}</a>`;
     const clean=u.split('#')[0];const p=clean?normPath(base,clean):'';
     if(p&&FILES.some(f=>f.path===p))return `<a href="#" data-open="${esc(p)}">${t}</a>`;
     return `<a href="${GH}/blob/main/${esc(p||base)}" target="_blank" rel="noopener">${t}</a>`;
   });
+  s=s.replace(/(?<![("=>\w])https?:\/\/[^\s<)]+[^\s<).,;:]/g,u=>`<a href="${u}" target="_blank" rel="noopener">${u}</a>`);
   s=s.replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>').replace(/(^|[^*\w])\*([^*\n]+)\*(?!\w)/g,'$1<i>$2</i>');
   return s.replace(/\u0000(\d+)\u0000/g,(_,k)=>`<code>${codes[+k]}</code>`);
 }

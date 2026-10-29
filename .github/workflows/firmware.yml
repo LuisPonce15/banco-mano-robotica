@@ -19,13 +19,20 @@ jobs:
             platforms: |
               - name: esp32:esp32
                 source-url: https://espressif.github.io/arduino-esp32/package_esp32_index.json
+            sketches: |
+              - firmware/banco_prueba
+              - firmware/banco_fase1
+          # El paquete 2.x solo se prueba con banco_prueba: las librerías
+          # actuales de banco_fase1 (ESP32Async, FastAccelStepper) piden el 3.x.
           - core: "2.0.17"
             platforms: |
               - name: esp32:esp32
                 source-url: https://espressif.github.io/arduino-esp32/package_esp32_index.json
                 version: 2.0.17
+            sketches: |
+              - firmware/banco_prueba
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: arduino/compile-sketches@v1
         with:
@@ -36,7 +43,6 @@ jobs:
             - name: ArduinoJson
             - source-url: https://github.com/ESP32Async/AsyncTCP.git
             - source-url: https://github.com/ESP32Async/ESPAsyncWebServer.git
-          sketch-paths: |
-            - firmware
+          sketch-paths: ${{ matrix.sketches }}
           enable-deltas-report: false
           enable-warnings-report: true
