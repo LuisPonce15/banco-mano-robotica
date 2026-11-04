@@ -1,6 +1,6 @@
 // ============================================================
 //  Banco FSR · caracterización de un FSR402 dentro de silicona
-//  ESP32-S de 38 pines (NodeMCU-32S / DevKitC) sobre base shield
+//  ESP32-S de 38 pines (NodeMCU-32S / DevKitC) o DevKit V1 de 30 pines, con o sin base shield
 //  + A4988 + NEMA 17 (17HS4401S) + 2× HX711 + 2 celdas de 10 kg
 //  Placa en Arduino IDE: ESP32 Dev Module (o NodeMCU-32S)
 //
@@ -40,7 +40,7 @@
 
 // ---------------- AJUSTES (revísalos antes de cargar) ----------------
 const float LEAD_MM       = 1.25;   // avance del tornillo por vuelta: varilla M8 = 1,25 mm; T8 = 8 mm. Mídelo.
-const int   MICROSTEP     = 16;     // MS1, MS2 y MS3 a 3,3 V
+const int   MICROSTEP     = 16;     // MS1, MS2 y MS3 a 3,3 V. Si quedan libres (conexión mínima): 1
 const bool  INVERT_DIR    = false;  // true si con "m 1" el punzón SUBE en vez de bajar
 const float MAX_DEPTH_MM  = 20.0;   // nunca baja más que esto por debajo del contacto
 const float Z_FREE_MM     = -0.5;   // posición de reposo: 0,5 mm por encima del contacto

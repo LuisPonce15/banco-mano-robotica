@@ -47,6 +47,36 @@ Vista desde arriba, con la antena arriba y el USB abajo. En **negrita**, los que
 
 Los pines son los mismos del firmware: **no hay que cambiar el código**. En Arduino IDE la placa sigue siendo **ESP32 Dev Module** (o **NodeMCU-32S**).
 
+## Si usas el ESP32 DevKit V1 de 30 pines
+
+Mismos GPIO y mismo firmware; solo cambia dónde están en la placa (antena arriba, USB abajo):
+
+| # | Izquierda | Uso | | Derecha | Uso |
+|---|---|---|---|---|---|
+| 4 | **D34** | FSR (F1–F4) | | RX0 | USB |
+| 8 | **D25** | A4988 STEP · GND (G de la fila) | | **D18** | HX711-2 DT, VCC, GND |
+| 9 | **D26** | A4988 DIR | | **TX2 (17)** | HX711-1 SCK |
+| 10 | **D27** | A4988 EN | | **RX2 (16)** | HX711-1 DT, VCC, GND |
+| 6 | D32 | libre | | **D19** | HX711-2 SCK |
+| 14 | GND | GND (sin shield) | | GND | GND (sin shield) |
+| 15 | VIN | no usar | | **3V3** | A4988 VDD |
+
+**Sin shield** (dupont o protoboard) el ESP32 tiene un solo pin 3V3: reparte 3V3 y GND con una protoboard o un Wago hacia el A4988 (VDD), los dos HX711 (VCC) y el FSR. Nunca alimentes estos módulos desde VIN o 5V.
+
+La pestaña **Conexiones** de la página tiene un selector de placa (30 o 38 pines) y de montaje (con o sin shield), con el pineado y la lista de chequeo de cada combinación.
+
+## A4988: conexión mínima
+
+La conexión típica de las guías (por ejemplo, Last Minute Engineers con un Arduino UNO) usa solo STEP, DIR, VDD, GND, VMOT, GND, las 4 bobinas y un puente RST–SLP. Con el ESP32:
+
+- VDD va a **3V3**, no a 5 V, para que el A4988 entienda las señales de 3,3 V del ESP32.
+- STEP → GPIO25 y DIR → GPIO26 (en el UNO eran los pines 3 y 2).
+- Si dejas **EN libre**, el motor queda siempre con fuerza y el comando `d` no lo suelta.
+- Si dejas **MS1–MS3 libres**, el driver da paso completo: pon `MICROSTEP = 1` en el firmware.
+- Mide SLP: si da menos de 2,3 V, tu módulo no trae el pull-up; une RST + SLP a VDD (fue la falla del banco del dedo).
+
+El banco usa la conexión completa (EN a GPIO27, MS1–MS3 a VDD, RST + SLP a VDD) para poder soltar el motor y tener 1/16 de paso.
+
 ## Cómo queda cada módulo en el shield
 
 ```

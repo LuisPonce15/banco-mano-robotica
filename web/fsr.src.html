@@ -394,8 +394,14 @@ fieldset.pg legend{font-family:var(--mono);font-size:11px;letter-spacing:.06em;t
   <!-- CONEXIONES -->
   <section class="panel" id="p-conexiones" role="tabpanel" aria-labelledby="t-conexiones" hidden>
     <div class="card">
-      <div class="card-head"><h2>Pineado en el shield · ESP32-S de 38 pines</h2><span class="small muted mono" id="pinCount">0 / 0</span></div>
-      <div class="note bad small"><b>Antes de conectar:</b> el puente de voltaje del shield en <b>3V3</b> (mide 3,3 V entre V y G) y el conector DC del shield <b>sin usar</b>. Con 5 V en V se dañan GPIO34 y las entradas de los HX711.</div>
+      <div class="card-head"><h2 id="pinTitle">Pineado del ESP32</h2><span class="small muted mono" id="pinCount">0 / 0</span></div>
+      <div class="row">
+        <span class="small muted">Placa</span>
+        <div class="seg" id="boardSeg"><button data-board="b30">DevKit V1 · 30 pines</button><button data-board="b38">ESP32-S · 38 pines</button></div>
+        <span class="small muted">Montaje</span>
+        <div class="seg" id="mountSeg"><button data-mount="shield">Sobre base shield</button><button data-mount="direct">Directo (dupont / protoboard)</button></div>
+      </div>
+      <div class="note bad small" id="pinNote"></div>
       <div class="pinapp">
         <div class="shield" id="shield"></div>
         <div class="pside">
@@ -404,7 +410,13 @@ fieldset.pg legend{font-family:var(--mono);font-size:11px;letter-spacing:.06em;t
           <button class="btn sm" id="pinReset">Desmarcar todo</button>
         </div>
       </div>
-      <p class="small muted">Vista desde arriba, con la antena del ESP32 arriba y el USB abajo. Cada GPIO tiene una fila G · V · S: el orden puede cambiar en tu shield, sigue su serigrafía. Haz clic en una fila para ver qué va ahí; marca cada cable al conectarlo y el pin se pone en verde. El progreso queda guardado en este navegador.</p>
+      <p class="small muted" id="pinHelp"></p>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2>A4988 de cerca</h2>
+        <div class="seg" id="drvSeg"><button data-drv="full">Como en el banco (EN + 1/16)</button><button data-drv="min">Mínima (EN y MS libres)</button></div></div>
+      <div class="schem" id="drvSvg"></div>
+      <div class="two small" id="drvNotes"></div>
     </div>
     <div class="card">
       <div class="card-head"><h2>Esquemático</h2><span class="small muted">Haz clic en un cable para ver de dónde a dónde va. Los valores en magenta son las lecturas en vivo.</span></div>
@@ -416,18 +428,7 @@ fieldset.pg legend{font-family:var(--mono);font-size:11px;letter-spacing:.06em;t
       <div class="detail" id="wDetail"></div>
     </div>
     <div class="two">
-      <div class="card"><h2>Pines usados</h2><div class="tbl"><table><thead><tr><th>Pin</th><th>Posición</th><th>Fila del shield</th><th>Va a</th></tr></thead><tbody>
-        <tr><td class="m">3V3</td><td class="m">izq. 1</td><td class="m">S</td><td>A4988 VDD (y en el driver: MS1–3, RST+SLP)</td></tr>
-        <tr><td class="m">GPIO34</td><td class="m">izq. 5</td><td class="m">V · S · G</td><td>FSR402, nodo del divisor, Rm y 100 nF</td></tr>
-        <tr><td class="m">GPIO25</td><td class="m">izq. 9</td><td class="m">S · G</td><td>A4988 STEP · GND lógica</td></tr>
-        <tr><td class="m">GPIO26</td><td class="m">izq. 10</td><td class="m">S</td><td>A4988 DIR</td></tr>
-        <tr><td class="m">GPIO27</td><td class="m">izq. 11</td><td class="m">S</td><td>A4988 EN (LOW = con fuerza)</td></tr>
-        <tr><td class="m">GPIO19</td><td class="m">der. 8</td><td class="m">S</td><td>HX711-2 SCK</td></tr>
-        <tr><td class="m">GPIO18</td><td class="m">der. 9</td><td class="m">G · V · S</td><td>HX711-2 GND · VCC · DT</td></tr>
-        <tr><td class="m">GPIO17</td><td class="m">der. 11</td><td class="m">S</td><td>HX711-1 SCK</td></tr>
-        <tr><td class="m">GPIO16</td><td class="m">der. 12</td><td class="m">G · V · S</td><td>HX711-1 GND · VCC · DT</td></tr>
-        <tr><td class="m">USB</td><td class="m">abajo</td><td class="m">—</td><td>Computador (5 V y datos)</td></tr>
-      </tbody></table></div><p class="small muted">Mismos GPIO del firmware: no hay que cambiar el código. Placa en Arduino IDE: ESP32 Dev Module.</p></div>
+      <div class="card"><h2>Pines usados</h2><div class="tbl"><table><thead><tr><th>Pin</th><th>Posición</th><th id="pinTblHead">Fila del shield</th><th>Va a</th></tr></thead><tbody id="pinTbl"></tbody></table></div><p class="small muted">Los mismos GPIO en las dos placas: el firmware no cambia. Placa en Arduino IDE: ESP32 Dev Module.</p></div>
       <div class="card"><h2>Celda de carga → HX711</h2><div class="tbl"><table><thead><tr><th>Hilo</th><th>HX711</th><th>Qué es</th></tr></thead><tbody>
         <tr><td><i class="cchip" style="background:#d0312d"></i>Rojo</td><td class="m">E+</td><td>Excitación +</td></tr>
         <tr><td><i class="cchip" style="background:#18212d"></i>Negro</td><td class="m">E−</td><td>Excitación −</td></tr>
@@ -1303,8 +1304,8 @@ const WIRES = [
   ['F3', 'cg', [[300, 615], [260, 615], [260, 628]]], ['F3', 'cg', [[260, 658], [260, 672], [400, 672]]],
   ['F4', 'cg', [[300, 615], [300, 634]]], ['F4', 'cg', [[300, 640], [300, 672]]]
 ];
-const BUSINFO = {B3: {id: 'Riel 3,3 V', de: 'Shield: fila 3V3 (A4988) y pines V de las filas 16, 18 y 34 (puente en 3V3)', a: 'A4988 VDD · MS1–MS3 · RST+SLP · HX711-1 y -2 VCC · FSR', cal: '24 AWG', col: 'violeta', nota: 'el regulador del ESP32 da hasta ~500 mA: aquí se usan unos 10 mA'},
-  BG: {id: 'Tierra común', de: 'Shield: pines G de las filas 25, 16, 18 y 34', a: 'A4988 GND (lógica) · HX711 · Rm · y por el A4988 al GND del adaptador', cal: '24 AWG', col: 'negro', nota: 'sin tierra común el A4988 no entiende STEP/DIR'}};
+const BUSINFO = {B3: {id: 'Riel 3,3 V', de: 'Pin 3V3 del ESP32 (con shield: fila 3V3 y pines V de las filas 16, 18 y 34, puente en 3V3)', a: 'A4988 VDD · MS1–MS3 · RST+SLP · HX711-1 y -2 VCC · FSR', cal: '24 AWG', col: 'violeta', nota: 'el regulador del ESP32 da hasta ~500 mA: aquí se usan unos 10 mA'},
+  BG: {id: 'Tierra común', de: 'GND del ESP32 (con shield: pines G de las filas 25, 16, 18 y 34)', a: 'A4988 GND (lógica) · HX711 · Rm · y por el A4988 al GND del adaptador', cal: '24 AWG', col: 'negro', nota: 'sin tierra común el A4988 no entiende STEP/DIR'}};
 function buildSchem() {
   const box = (x, y, w, h, t, sub) => `<rect class="box" x="${x}" y="${y}" width="${w}" height="${h}" rx="5"/><text class="tt" x="${x + 10}" y="${y + 20}">${t}</text>${sub ? `<text class="t2" x="${x + 10}" y="${y + 36}">${sub}</text>` : ''}`;
   const pinL = (x, y, t) => `<circle class="dot" cx="${x}" cy="${y}" r="2.6"/><text x="${x + 7}" y="${y + 4}">${t}</text>`;
@@ -1312,7 +1313,7 @@ function buildSchem() {
   const ln = (x1, y1, x2, y2) => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="var(--ink)" stroke-width="2"/>`;
   let s = `<svg viewBox="0 0 1180 700" role="img" aria-label="Esquemático del banco FSR">`;
   s += box(20, 300, 120, 70, 'Computador', 'USB: 5 V + datos');
-  s += box(200, 150, 180, 390, 'ESP32-S 38 p + shield', 'puente V en 3V3');
+  s += box(200, 150, 180, 390, B().short + (SHD() ? ' + shield' : ''), SHD() ? 'puente V en 3V3' : 'pines directos');
   [['3V3', 210], ['GND', 235], ['GPIO25', 270], ['GPIO26', 292], ['GPIO27', 314], ['GPIO16', 350], ['GPIO17', 372], ['GPIO18', 394], ['GPIO19', 416]].forEach(([t, y]) => s += pinR(380, y, t));
   s += `<circle class="dot" cx="300" cy="540" r="2.6"/><text x="300" y="530" text-anchor="middle">GPIO34 (ADC1)</text>`;
   s += box(560, 100, 160, 240, 'A4988', '1/16 · Vref 0,8 V');
@@ -1336,7 +1337,7 @@ function buildSchem() {
   s += `<text class="live" id="zLbl" x="980" y="372">—</text>`;
   s += '</svg>';
   $('#schem').innerHTML = s;
-  $('#schem').addEventListener('click', e => {const g = e.target.closest('.wire'); selWire(g ? g.dataset.w : null)});
+  if (!buildSchem.bound) {buildSchem.bound = true; $('#schem').addEventListener('click', e => {const g = e.target.closest('.wire'); selWire(g ? g.dataset.w : null)})}
   selWire(null);
 }
 function selWire(id) {
@@ -1354,78 +1355,202 @@ function updLiveSchem() {
 }
 
 
-/* ================= pineado en el shield ================= */
-const SH = {
-  L: ['3V3', 'EN', 'GPIO36 VP', 'GPIO39 VN', 'GPIO34', 'GPIO35', 'GPIO32', 'GPIO33', 'GPIO25', 'GPIO26', 'GPIO27', 'GPIO14', 'GPIO12', 'GND', 'GPIO13', 'SD2', 'SD3', 'CMD', '5V'],
-  R: ['GND', 'GPIO23', 'GPIO22', 'TX0', 'RX0', 'GPIO21', 'GND', 'GPIO19', 'GPIO18', 'GPIO5', 'GPIO17', 'GPIO16', 'GPIO4', 'GPIO0', 'GPIO2', 'GPIO15', 'SD1', 'SD0', 'CLK'],
-  avoid: {L: [13, 16, 17, 18], R: [4, 5, 14, 15, 16, 17, 18, 19]},
-  // [lado, fila, pin, tipo, cables]
-  uses: [
-    ['L', 1, 'S', 'k3', ['L1']],
-    ['L', 5, 'V', 'k3', ['F1']], ['L', 5, 'S', 'ks', ['F2', 'F3', 'F4']], ['L', 5, 'G', 'kg', ['F3', 'F4']],
-    ['L', 9, 'S', 'ks', ['S1']], ['L', 9, 'G', 'kg', ['L2']], ['L', 10, 'S', 'ks', ['S2']], ['L', 11, 'S', 'ks', ['S3']],
-    ['R', 8, 'S', 'ks', ['H8']], ['R', 9, 'S', 'ks', ['H7']], ['R', 9, 'V', 'k3', ['H5']], ['R', 9, 'G', 'kg', ['H6']],
-    ['R', 11, 'S', 'ks', ['H4']], ['R', 12, 'S', 'ks', ['H3']], ['R', 12, 'V', 'k3', ['H1']], ['R', 12, 'G', 'kg', ['H2']]
-  ],
-  notes: {L1: 'S → A4988 VDD', L5: 'V → FSR · S → nodo + Rm · G → Rm', L9: 'S → A4988 STEP · G → A4988 GND', L10: 'S → A4988 DIR', L11: 'S → A4988 EN',
-    R8: 'S → HX711-2 SCK', R9: 'HX711-2: S → DT · V → VCC · G → GND', R11: 'S → HX711-1 SCK', R12: 'HX711-1: S → DT · V → VCC · G → GND'},
-  groups: [['Antes de empezar', ['J', 'DC', 'U1']], ['A4988', ['L1', 'L2', 'S1', 'S2', 'S3']], ['HX711-1 · celda 1', ['H1', 'H2', 'H3', 'H4']], ['HX711-2 · celda 2', ['H5', 'H6', 'H7', 'H8']], ['FSR402', ['F1', 'F2', 'F3', 'F4']]],
-  extra: {J: {de: 'Puente V del shield en 3V3', a: 'medido: 3,3 V entre V y G'}, DC: {de: 'Conector DC del shield', a: 'sin conectar (el ESP32 va por USB)'}}
+/* ================= pineado: placa de 30 o 38 pines, con o sin shield ================= */
+const BOARDS = {
+  b30: {name: 'ESP32 DevKit V1 · 30 pines', short: 'DevKit V1 30 p', chip: 'ESP32 DevKit V1', n: 15,
+    L: [['EN', 'EN'], ['VP (36)', '36'], ['VN (39)', '39'], ['D34', '34'], ['D35', '35'], ['D32', '32'], ['D33', '33'], ['D25', '25'], ['D26', '26'], ['D27', '27'], ['D14', '14'], ['D12', '12'], ['D13', '13'], ['GND', 'GND'], ['VIN', 'VIN']],
+    R: [['D23', '23'], ['D22', '22'], ['TX0', 'TX0'], ['RX0', 'RX0'], ['D21', '21'], ['D19', '19'], ['D18', '18'], ['D5', '5'], ['TX2 (17)', '17'], ['RX2 (16)', '16'], ['D4', '4'], ['D2', '2'], ['D15', '15'], ['GND', 'GND'], ['3V3', '3V3']]},
+  b38: {name: 'ESP32-S · 38 pines', short: 'ESP32-S 38 p', chip: 'ESP-32S', n: 19,
+    L: [['3V3', '3V3'], ['EN', 'EN'], ['GPIO36 VP', '36'], ['GPIO39 VN', '39'], ['GPIO34', '34'], ['GPIO35', '35'], ['GPIO32', '32'], ['GPIO33', '33'], ['GPIO25', '25'], ['GPIO26', '26'], ['GPIO27', '27'], ['GPIO14', '14'], ['GPIO12', '12'], ['GND', 'GND'], ['GPIO13', '13'], ['SD2', 'SD2'], ['SD3', 'SD3'], ['CMD', 'CMD'], ['5V', '5V']],
+    R: [['GND', 'GND'], ['GPIO23', '23'], ['GPIO22', '22'], ['TX0', 'TX0'], ['RX0', 'RX0'], ['GPIO21', '21'], ['GND', 'GND'], ['GPIO19', '19'], ['GPIO18', '18'], ['GPIO5', '5'], ['GPIO17', '17'], ['GPIO16', '16'], ['GPIO4', '4'], ['GPIO0', '0'], ['GPIO2', '2'], ['GPIO15', '15'], ['SD1', 'SD1'], ['SD0', 'SD0'], ['CLK', 'CLK']]}
 };
-let PINDONE = store.get('fsrPin', {}), PINSEL = null;
-function cableTxt(id) {const c = CABLES[id] || SH.extra[id]; return c ? `${c.de} → ${c.a}` : id}
+const AVOID = new Set(['12', '0', '2', '5', '15', 'TX0', 'RX0', 'SD0', 'SD1', 'SD2', 'SD3', 'CMD', 'CLK']);
+// [cable, qué pin (señal, 3V3, 3V3 junto a una fila, GND junto a una fila), fila de referencia, destino]
+const PSPEC = [
+  ['L1', '3V3', null, 'A4988 VDD'], ['L2', 'GND', '25', 'A4988 GND'],
+  ['S1', '25', null, 'A4988 STEP'], ['S2', '26', null, 'A4988 DIR'], ['S3', '27', null, 'A4988 EN'],
+  ['H1', 'V', '16', 'HX711-1 VCC'], ['H2', 'GND', '16', 'HX711-1 GND'], ['H3', '16', null, 'HX711-1 DT'], ['H4', '17', null, 'HX711-1 SCK'],
+  ['H5', 'V', '18', 'HX711-2 VCC'], ['H6', 'GND', '18', 'HX711-2 GND'], ['H7', '18', null, 'HX711-2 DT'], ['H8', '19', null, 'HX711-2 SCK'],
+  ['F1', 'V', '34', 'FSR pata 1'], ['F2', '34', null, 'FSR pata 2'], ['F3', '34', null, 'Rm'], ['F3', 'GND', '34', 'Rm'], ['F4', '34', null, '100 nF'], ['F4', 'GND', '34', '100 nF']
+];
+const PDEST = {L1: 'A4988 VDD', L2: 'A4988 GND (lado de la lógica)', S1: 'A4988 STEP', S2: 'A4988 DIR', S3: 'A4988 EN', H1: 'HX711-1 VCC (y VDD)', H2: 'HX711-1 GND', H3: 'HX711-1 DT', H4: 'HX711-1 SCK',
+  H5: 'HX711-2 VCC (y VDD)', H6: 'HX711-2 GND', H7: 'HX711-2 DT', H8: 'HX711-2 SCK', F1: 'FSR402 pata 1', F2: 'FSR402 pata 2 (nodo del divisor)', F3: 'Rm 10 kΩ entre el nodo y GND', F4: '100 nF entre el nodo y GND (opcional)', U1: 'Computador'};
+let CONF = Object.assign({board: 'b38', mount: 'shield', drv: 'full'}, store.get('fsrConf', {}));
+if (!BOARDS[CONF.board]) CONF.board = 'b38';
+const B = () => BOARDS[CONF.board], SHD = () => CONF.mount === 'shield';
+function findPin(id, near) {          // {side,row} del pin; con varios (GND) elige el más cercano a la fila de referencia
+  const b = B(), out = []; ['L', 'R'].forEach(side => b[side].forEach(([, pid], i) => {if (pid === id) out.push({side, row: i + 1})}));
+  if (!out.length) return null; if (!near) return out[0];
+  return out.sort((a, c) => (a.side !== near.side) * 100 + Math.abs(a.row - near.row) - ((c.side !== near.side) * 100 + Math.abs(c.row - near.row)))[0];
+}
+function pinUses() {                   // [{side,row,role,cab,kind,dest}]
+  const uses = [];
+  PSPEC.forEach(([cab, what, ref, dest]) => {
+    const refPin = ref ? findPin(ref) : null; let p, role, kind;
+    if (what === '3V3') {p = findPin('3V3'); role = 'S'; kind = 'k3'}
+    else if (what === 'V') {if (SHD()) {p = refPin; role = 'V'} else {p = findPin('3V3', refPin); role = 'S'} kind = 'k3'}
+    else if (what === 'GND') {if (SHD()) {p = refPin; role = 'G'} else {p = findPin('GND', refPin); role = 'S'} kind = 'kg'}
+    else {p = findPin(what); role = 'S'; kind = 'ks'}
+    if (p) uses.push({side: p.side, row: p.row, role, cab, kind, dest});
+  });
+  return uses;
+}
+const sideTxt = s => s === 'L' ? 'izq.' : 'der.';
+function pinDesc(u, withRole = true) {const lab = B()[u.side][u.row - 1][0];
+  return SHD() ? `Shield · fila ${lab}${withRole ? ' · ' + u.role : ''} (${sideTxt(u.side)} ${u.row})` : `Pin ${lab} (${sideTxt(u.side)} ${u.row})`}
+function cableTxt(id) {
+  const ex = pinExtras().find(e => e[0] === id); if (ex) return ex[1];
+  if (id === 'U1') return 'USB del ESP32 → computador (5 V y datos)';
+  const us = pinUses().filter(u => u.cab === id); if (!us.length) return id;
+  if (SHD() && us.length > 1 && us.every(u => u.row === us[0].row && u.side === us[0].side)) return `${pinDesc(us[0], false)} · ${us.map(u => u.role).join(' y ')} → ${PDEST[id]}`;
+  return us.map(u => pinDesc(u)).join(' y ') + ' → ' + PDEST[id];
+}
+function pinExtras() {
+  return SHD() ? [['J', 'Puente V del shield en 3V3 (medido: 3,3 V entre V y G)'], ['DC', 'Conector DC del shield sin conectar']]
+    : [['PB', 'Protoboard o Wago para repartir 3V3 y GND a A4988, HX711 y FSR']];
+}
+function pinGroups() {return [['Antes de empezar', [...pinExtras().map(e => e[0]), 'U1']], ['A4988', ['L1', 'L2', 'S1', 'S2', 'S3']], ['HX711-1 · celda 1', ['H1', 'H2', 'H3', 'H4']], ['HX711-2 · celda 2', ['H5', 'H6', 'H7', 'H8']], ['FSR402', ['F1', 'F2', 'F3', 'F4']]]}
+const pinKey = () => `fsrPin-${CONF.board}-${CONF.mount}`;
+let PINDONE = store.get(pinKey(), {}), PINSEL = null;
+function rowNote(side, row, uses) {
+  const us = uses.filter(u => u.side === side && u.row === row); if (!us.length) return null;
+  const short = d => d.replace('HX711-1 ', '1·').replace('HX711-2 ', '2·').replace('A4988 ', '');
+  if (SHD()) {const by = {}; us.forEach(u => {(by[u.role] = by[u.role] || []).push(u)}); const order = ['S', 'V', 'G'].filter(r => by[r]);
+    const mod = [...new Set(us.map(u => u.dest.split(' ')[0]))]; const pre = mod.length === 1 && /HX711|A4988/.test(mod[0]) && us.length > 1 ? mod[0] + ': ' : '';
+    return pre + order.map(r => `${r} → ${[...new Set(by[r].map(u => pre ? short(u.dest) : u.dest))].join(' + ')}`).join(' · ')}
+  return [...new Set(us.map(u => u.dest))].join(' · ');
+}
 function buildShield() {
-  const X = {L: {G: 365, V: 395, S: 425, sock: 466, lab: 478}, R: {S: 675, V: 705, G: 735, sock: 634, lab: 622}}, y0 = 150, dy = 28, Y = r => y0 + (r - 1) * dy;
-  let s = `<svg viewBox="0 0 1100 770" role="img" aria-label="Shield del ESP32-S de 38 pines con los pines usados">`;
-  s += `<rect x="300" y="56" width="500" height="670" rx="14" fill="var(--paper)" stroke="var(--ink)" stroke-width="1.5"/><text class="tt" x="318" y="84">Base shield · 38 pines</text>`;
-  s += `<rect x="676" y="66" width="110" height="34" rx="4" fill="var(--sheet)" stroke="var(--ink-2)"/><text class="t2" x="684" y="88">V:</text><rect x="704" y="72" width="36" height="22" rx="3" fill="var(--ok)"/><text x="722" y="87" text-anchor="middle" style="fill:#fff;font-weight:600">3V3</text><text class="t2" x="762" y="88" text-anchor="middle">5V</text>`;
-  s += `<rect x="312" y="684" width="56" height="30" rx="4" fill="var(--sheet)" stroke="var(--ink-2)"/><text class="t2" x="340" y="703" text-anchor="middle">DC</text><line x1="314" y1="686" x2="366" y2="712" stroke="var(--danger)" stroke-width="2"/><text class="t2" x="378" y="703">no usar</text>`;
-  s += `<rect x="450" y="96" width="200" height="604" rx="6" fill="var(--sheet)" stroke="var(--ink)" stroke-width="1.3"/>`;
-  s += `<rect x="478" y="104" width="144" height="26" rx="3" fill="var(--grid)" stroke="var(--ink-3)" stroke-dasharray="3 3"/><text class="tt" x="550" y="122" text-anchor="middle" style="font-size:13px">ESP-32S · antena</text>`;
-  s += `<rect x="525" y="696" width="50" height="34" rx="4" fill="var(--metal)" stroke="var(--ink)"/><text x="550" y="748" text-anchor="middle" class="t2">USB → computador</text>`;
-  s += `<text class="t2" x="${X.L.G}" y="${y0 - 16}" text-anchor="middle">G</text><text class="t2" x="${X.L.V}" y="${y0 - 16}" text-anchor="middle">V</text><text class="t2" x="${X.L.S}" y="${y0 - 16}" text-anchor="middle">S</text>`;
-  s += `<text class="t2" x="${X.R.S}" y="${y0 - 16}" text-anchor="middle">S</text><text class="t2" x="${X.R.V}" y="${y0 - 16}" text-anchor="middle">V</text><text class="t2" x="${X.R.G}" y="${y0 - 16}" text-anchor="middle">G</text>`;
+  const b = B(), n = b.n, sh = SHD(), y0 = 150, dy = n === 15 ? 34 : 28, Y = r => y0 + (r - 1) * dy, yEnd = Y(n);
+  const X = {L: {G: 365, V: 395, S: sh ? 425 : 436, sock: 466, lab: 478}, R: {S: sh ? 675 : 664, V: 705, G: 735, sock: 634, lab: 622}};
+  const uses = pinUses(), H = yEnd + 120;
+  let s = `<svg viewBox="0 0 1100 ${H}" role="img" aria-label="${esc(b.name)} con los pines usados">`;
+  if (sh) {
+    s += `<rect x="300" y="56" width="500" height="${yEnd - 6}" rx="14" fill="var(--paper)" stroke="var(--ink)" stroke-width="1.5"/><text class="tt" x="318" y="84">Base shield · ${n * 2} pines</text>`;
+    s += `<rect x="676" y="66" width="110" height="34" rx="4" fill="var(--sheet)" stroke="var(--ink-2)"/><text class="t2" x="684" y="88">V:</text><rect x="704" y="72" width="36" height="22" rx="3" fill="var(--ok)"/><text x="722" y="87" text-anchor="middle" style="fill:#fff;font-weight:600">3V3</text><text class="t2" x="762" y="88" text-anchor="middle">5V</text>`;
+    s += `<rect x="312" y="${yEnd + 14}" width="56" height="28" rx="4" fill="var(--sheet)" stroke="var(--ink-2)"/><text class="t2" x="340" y="${yEnd + 32}" text-anchor="middle">DC</text><line x1="314" y1="${yEnd + 16}" x2="366" y2="${yEnd + 40}" stroke="var(--danger)" stroke-width="2"/><text class="t2" x="374" y="${yEnd + 32}">no usar</text>`;
+    s += `<text class="t2" x="${X.L.G}" y="${y0 - 16}" text-anchor="middle">G</text><text class="t2" x="${X.L.V}" y="${y0 - 16}" text-anchor="middle">V</text><text class="t2" x="${X.L.S}" y="${y0 - 16}" text-anchor="middle">S</text>`;
+    s += `<text class="t2" x="${X.R.S}" y="${y0 - 16}" text-anchor="middle">S</text><text class="t2" x="${X.R.V}" y="${y0 - 16}" text-anchor="middle">V</text><text class="t2" x="${X.R.G}" y="${y0 - 16}" text-anchor="middle">G</text>`;
+  }
+  s += `<rect x="450" y="96" width="200" height="${yEnd - 70}" rx="6" fill="var(--sheet)" stroke="var(--ink)" stroke-width="1.3"/>`;
+  s += `<rect x="478" y="104" width="144" height="26" rx="3" fill="var(--grid)" stroke="var(--ink-3)" stroke-dasharray="3 3"/><text class="tt" x="550" y="122" text-anchor="middle" style="font-size:13px">${b.chip} · antena</text>`;
+  s += `<rect x="525" y="${yEnd + 20}" width="50" height="34" rx="4" fill="var(--metal)" stroke="var(--ink)"/><text x="550" y="${yEnd + 72}" text-anchor="middle" class="t2">USB → computador</text>`;
   const col = {k3: 'var(--w3)', kg: 'var(--wgnd)', ks: 'var(--wsig)'};
-  ['L', 'R'].forEach(side => SH[side].forEach((lab, i) => {
-    const r = i + 1, y = Y(r), key = side + r, x = X[side], used = SH.uses.filter(u => u[0] === side && u[1] === r), avoid = SH.avoid[side].includes(r);
-    s += `<g class="prow" data-row="${key}"><rect class="rowbg" x="${side === 'L' ? 350 : 610}" y="${y - 12}" width="140" height="24" rx="4" fill="transparent" stroke="transparent"/>`;
-    ['G', 'V', 'S'].forEach(pn => {const u = used.find(q => q[2] === pn); const done = u && u[4].every(c => PINDONE[c]);
-      s += `<rect class="pn ${u ? u[3] : avoid ? 'avoid' : 'free'}${done ? ' done' : ''}" data-pin="${key}${pn}" x="${x[pn] - 7}" y="${y - 7}" width="14" height="14" rx="2"/>`});
+  ['L', 'R'].forEach(side => b[side].forEach(([lab, pid], i) => {
+    const r = i + 1, y = Y(r), key = side + r, x = X[side], used = uses.filter(u => u.side === side && u.row === r), avoid = AVOID.has(pid);
+    s += `<g class="prow" data-row="${key}"><rect class="rowbg" x="${side === 'L' ? (sh ? 350 : 420) : (sh ? 610 : 610)}" y="${y - 12}" width="${sh ? 140 : 70}" height="24" rx="4" fill="transparent" stroke="transparent"/>`;
+    (sh ? ['G', 'V', 'S'] : ['S']).forEach(pn => {const u = used.find(q => q.role === pn); const done = u && used.filter(q => q.role === pn).every(q => PINDONE[q.cab]);
+      s += `<rect class="pn ${u ? u.kind : avoid ? 'avoid' : 'free'}${done ? ' done' : ''}" x="${x[pn] - 7}" y="${y - 7}" width="14" height="14" rx="2"/>`});
     s += `<circle cx="${x.sock}" cy="${y}" r="3.2" fill="var(--ink-2)"/>`;
     s += `<text x="${x.lab}" y="${y + 4}" text-anchor="${side === 'L' ? 'start' : 'end'}" style="${used.length ? 'font-weight:600' : ''}${avoid ? ';fill:var(--warn)' : ''}">${lab}</text>`;
     s += `<text class="t2" x="${side === 'L' ? 336 : 764}" y="${y + 4}" text-anchor="${side === 'L' ? 'end' : 'start'}">${r}</text>`;
-    if (SH.notes[key]) {const k = used[0][3];
-      s += side === 'L' ? `<polyline class="lead" stroke="${col[k]}" points="294,${y} 314,${y}"/><text class="lbl" x="290" y="${y + 4}" text-anchor="end">${SH.notes[key]}</text>`
-        : `<polyline class="lead" stroke="${col[k]}" points="786,${y} 806,${y}"/><text class="lbl" x="810" y="${y + 4}">${SH.notes[key]}</text>`}
+    const note = rowNote(side, r, uses);
+    if (note) {const k = used[0].kind, parts = [];
+      note.split(' · ').forEach(seg => {const last = parts.length - 1; if (last >= 0 && (parts[last] + ' · ' + seg).length <= 38) parts[last] += ' · ' + seg; else parts.push(seg)});
+      const tx = side === 'L' ? 290 : 810, anc = side === 'L' ? 'end' : 'start', y1 = y + 4 - (parts.length - 1) * 6;
+      s += side === 'L' ? `<polyline class="lead" stroke="${col[k]}" points="294,${y} 314,${y}"/>` : `<polyline class="lead" stroke="${col[k]}" points="786,${y} 806,${y}"/>`;
+      s += `<text class="lbl" x="${tx}" y="${y1}" text-anchor="${anc}">${parts.map((t, j) => j ? `<tspan x="${tx}" dy="12">${esc(t)}</tspan>` : esc(t)).join('')}</text>`}
     s += '</g>';
   }));
-  s += `<g transform="translate(20,720)"><rect width="14" height="14" rx="2" class="pn ks"/><text x="20" y="11">señal</text><rect x="80" width="14" height="14" rx="2" class="pn k3"/><text x="100" y="11">3,3 V</text><rect x="160" width="14" height="14" rx="2" class="pn kg"/><text x="180" y="11">GND</text>`
-    + `<rect y="22" width="14" height="14" rx="2" class="pn avoid"/><text x="20" y="33">no usar (flash o arranque)</text><rect x="200" y="22" width="14" height="14" rx="2" class="pn done" style="fill:var(--sheet)"/><text x="220" y="33">conectado</text></g>`;
+  s += `<g transform="translate(20,${H - 46})"><rect width="14" height="14" rx="2" class="pn ks"/><text x="20" y="11">señal</text><rect x="80" width="14" height="14" rx="2" class="pn k3"/><text x="100" y="11">3,3 V</text><rect x="160" width="14" height="14" rx="2" class="pn kg"/><text x="180" y="11">GND</text>`
+    + `<rect y="22" width="14" height="14" rx="2" class="pn avoid"/><text x="20" y="33">no usar (flash, arranque o USB)</text><rect x="240" y="22" width="14" height="14" rx="2" class="pn done" style="fill:var(--sheet)"/><text x="260" y="33">conectado</text></g>`;
   s += '</svg>';
   $('#shield').innerHTML = s;
 }
 function buildPinList() {
-  $('#pinList').innerHTML = SH.groups.map(([g, ids]) => `<fieldset><legend>${g}</legend>${ids.map(id => `<label data-cab="${id}"><input type="checkbox" data-pc="${id}" ${PINDONE[id] ? 'checked' : ''}><b>${id.length > 2 ? '' : id}</b><span>${esc(cableTxt(id))}</span></label>`).join('')}</fieldset>`).join('');
+  $('#pinList').innerHTML = pinGroups().map(([g, ids]) => `<fieldset><legend>${g}</legend>${ids.map(id => `<label data-cab="${id}"><input type="checkbox" data-pc="${id}" ${PINDONE[id] ? 'checked' : ''}><b>${id}</b><span>${esc(cableTxt(id))}</span></label>`).join('')}</fieldset>`).join('');
   updPinCount();
 }
-function updPinCount() {const all = SH.groups.flatMap(g => g[1]); const n = all.filter(id => PINDONE[id]).length; $('#pinCount').textContent = `${n} / ${all.length} conectados`}
+function updPinCount() {const all = pinGroups().flatMap(g => g[1]); const n = all.filter(id => PINDONE[id]).length; $('#pinCount').textContent = `${n} / ${all.length} conectados`}
 function selRow(key) {
   PINSEL = key; $$('#shield .prow').forEach(g => g.classList.toggle('on', g.dataset.row === key));
-  const side = key ? key[0] : null, r = key ? +key.slice(1) : 0, used = key ? SH.uses.filter(u => u[0] === side && u[1] === r) : [];
-  const ids = [...new Set(used.flatMap(u => u[4]))];
+  const uses = pinUses(), side = key ? key[0] : null, r = key ? +key.slice(1) : 0, used = key ? uses.filter(u => u.side === side && u.row === r) : [];
+  const ids = [...new Set(used.map(u => u.cab))];
   $$('#pinList label').forEach(l => l.classList.toggle('hl', ids.includes(l.dataset.cab)));
-  if (!key) {$('#pinDetail').innerHTML = '<p class="small muted">Haz clic en una fila del shield para ver qué cables van ahí.</p>'; return}
-  const lab = SH[side][r - 1], avoid = SH.avoid[side].includes(r);
-  $('#pinDetail').innerHTML = `<h3>${esc(lab)} <span class="small muted mono">${side === 'L' ? 'izquierda' : 'derecha'} · fila ${r}</span></h3>` +
-    (used.length ? `<dl class="kv">${used.map(u => `<dt>${u[2]}</dt><dd style="font-family:var(--body);font-size:13px">${u[4].map(c => `<b class="mono">${c}</b> ${esc(cableTxt(c))}`).join('<br>')}</dd>`).join('')}</dl>`
-      : `<p class="small muted">${avoid ? 'No usar: este pin es de la memoria flash o decide cómo arranca el ESP32.' : 'Libre en este banco.'}</p>`);
+  if (!key) {$('#pinDetail').innerHTML = '<p class="small muted">Haz clic en un pin para ver qué cables van ahí.</p>'; return}
+  const [lab, pid] = B()[side][r - 1];
+  const by = {}; used.forEach(u => {(by[u.role] = by[u.role] || []).push(u)});
+  $('#pinDetail').innerHTML = `<h3>${esc(lab)} <span class="small muted mono">${side === 'L' ? 'izquierda' : 'derecha'} · ${r}</span></h3>` +
+    (used.length ? `<dl class="kv">${Object.entries(by).map(([ro, us]) => `<dt>${SHD() ? ro : 'pin'}</dt><dd style="font-family:var(--body);font-size:13px">${[...new Set(us.map(u => u.cab))].map(c => `<b class="mono">${c}</b> ${esc(PDEST[c])}`).join('<br>')}</dd>`).join('')}</dl>`
+      : `<p class="small muted">${AVOID.has(pid) ? 'No usar: es de la memoria flash, del USB o decide cómo arranca el ESP32.' : 'Libre en este banco.'}</p>`);
 }
+function pinsTable() {
+  const uses = pinUses(), rows = {};
+  uses.forEach(u => {const k = u.side + u.row; (rows[k] = rows[k] || {u, roles: new Set(), dest: []}); rows[k].roles.add(u.role); rows[k].dest.push(u.dest)});
+  const list = Object.values(rows).sort((a, c) => (a.u.side > c.u.side) - (a.u.side < c.u.side) || a.u.row - c.u.row);
+  $('#pinTblHead').textContent = SHD() ? 'Fila del shield' : 'Conexión';
+  $('#pinTbl').innerHTML = list.map(x => `<tr><td class="m">${esc(B()[x.u.side][x.u.row - 1][0])}</td><td class="m">${sideTxt(x.u.side)} ${x.u.row}</td><td class="m">${SHD() ? [...x.roles].join(' · ') : 'pin'}</td><td>${esc([...new Set(x.dest)].join(' · '))}</td></tr>`).join('')
+    + `<tr><td class="m">USB</td><td class="m">abajo</td><td class="m">—</td><td>Computador (5 V y datos)</td></tr>`;
+}
+function applyConf() {
+  store.set('fsrConf', CONF); PINDONE = store.get(pinKey(), {});
+  $$('#boardSeg button').forEach(x => x.setAttribute('aria-pressed', x.dataset.board === CONF.board));
+  $$('#mountSeg button').forEach(x => x.setAttribute('aria-pressed', x.dataset.mount === CONF.mount));
+  $$('#drvSeg button').forEach(x => x.setAttribute('aria-pressed', x.dataset.drv === CONF.drv));
+  $('#pinTitle').textContent = `Pineado · ${B().name}${SHD() ? ' sobre base shield' : ''}`;
+  $('#pinNote').innerHTML = SHD() ? '<b>Antes de conectar:</b> el puente de voltaje del shield en <b>3V3</b> (mide 3,3 V entre V y G) y el conector DC del shield <b>sin usar</b>. Con 5 V en V se dañan GPIO34 y las entradas de los HX711.'
+    : '<b>Antes de conectar:</b> el ESP32 tiene un solo pin 3V3 y pocos GND. Reparte 3V3 y GND con una protoboard o un Wago: van al A4988 (VDD), a los dos HX711 (VCC) y al FSR. Nunca uses VIN ni 5V para estos módulos.';
+  $('#pinHelp').textContent = `Vista desde arriba, con la antena del ESP32 arriba y el USB abajo. ${SHD() ? 'Cada GPIO tiene una fila G · V · S: el orden puede cambiar en tu shield, sigue su serigrafía. ' : ''}Los nombres siguen la serigrafía típica de ${B().name}; revísala en tu placa. Haz clic en un pin para ver qué va ahí; marca cada cable al conectarlo y el pin se pone en verde. El progreso se guarda en este navegador, aparte para cada placa y montaje.`;
+  buildShield(); buildPinList(); selRow(null); pinsTable(); buildDrv(); buildSchem();
+}
+$('#boardSeg').addEventListener('click', e => {const b = e.target.closest('[data-board]'); if (b) {CONF.board = b.dataset.board; applyConf()}});
+$('#mountSeg').addEventListener('click', e => {const b = e.target.closest('[data-mount]'); if (b) {CONF.mount = b.dataset.mount; applyConf()}});
+$('#drvSeg').addEventListener('click', e => {const b = e.target.closest('[data-drv]'); if (b) {CONF.drv = b.dataset.drv; store.set('fsrConf', CONF); applyConf()}});
 $('#shield').addEventListener('click', e => {const g = e.target.closest('.prow'); selRow(g && g.dataset.row !== PINSEL ? g.dataset.row : null)});
-$('#pinList').addEventListener('change', e => {const id = e.target.dataset.pc; if (!id) return; PINDONE[id] = e.target.checked; store.set('fsrPin', PINDONE); const k = PINSEL; buildShield(); selRow(k); updPinCount()});
-$('#pinList').addEventListener('mouseover', e => {const l = e.target.closest('label[data-cab]'); if (!l) return; const id = l.dataset.cab;
-  $$('#shield .prow').forEach(g => {const side = g.dataset.row[0], r = +g.dataset.row.slice(1); g.classList.toggle('on', SH.uses.some(u => u[0] === side && u[1] === r && u[4].includes(id)) || g.dataset.row === PINSEL)})});
+$('#pinList').addEventListener('change', e => {const id = e.target.dataset.pc; if (!id) return; PINDONE[id] = e.target.checked; store.set(pinKey(), PINDONE); const k = PINSEL; buildShield(); selRow(k); updPinCount()});
+$('#pinList').addEventListener('mouseover', e => {const l = e.target.closest('label[data-cab]'); if (!l) return; const id = l.dataset.cab, uses = pinUses();
+  $$('#shield .prow').forEach(g => {const side = g.dataset.row[0], r = +g.dataset.row.slice(1); g.classList.toggle('on', uses.some(u => u.side === side && u.row === r && u.cab === id) || g.dataset.row === PINSEL)})});
 $('#pinList').addEventListener('mouseleave', () => selRow(PINSEL));
-$('#pinReset').onclick = () => {PINDONE = {}; store.set('fsrPin', PINDONE); buildShield(); buildPinList(); selRow(PINSEL)};
+$('#pinReset').onclick = () => {PINDONE = {}; store.set(pinKey(), PINDONE); buildShield(); buildPinList(); selRow(PINSEL)};
+
+/* A4988 de cerca (como la guía de Last Minute Engineers, adaptado al ESP32) */
+function buildDrv() {
+  const full = CONF.drv === 'full', uses = pinUses();
+  const at = cab => {const u = uses.find(x => x.cab === cab); return u ? pinDesc(u) : '—'};
+  const P_ = ['EN', 'MS1', 'MS2', 'MS3', 'RST', 'SLP', 'STEP', 'DIR'], Q = ['VMOT', 'GND', '2B', '2A', '1A', '1B', 'VDD', 'GND'], y = i => 110 + i * 32;
+  const wl = (pts_, c, w = 2.4, dash = '') => `<polyline fill="none" stroke="${c}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" ${dash ? `stroke-dasharray="${dash}"` : ''} points="${pts_.map(p => p.join(',')).join(' ')}"/>`;
+  const tx = (x, yy, t, anc = 'start', cls = '') => `<text x="${x}" y="${yy + 4}" text-anchor="${anc}" class="${cls}">${esc(t)}</text>`;
+  let s = `<svg viewBox="0 0 1100 420" role="img" aria-label="Conexión del A4988">`;
+  s += `<rect x="430" y="80" width="170" height="290" rx="6" fill="var(--danger-bg)" stroke="var(--danger)" stroke-width="1.5"/><text class="tt" x="515" y="104" text-anchor="middle">A4988</text>`;
+  s += `<circle cx="515" cy="132" r="10" fill="var(--sheet)" stroke="var(--ink-2)"/><text class="t2" x="532" y="136">Vref</text><rect x="480" y="190" width="70" height="70" rx="4" fill="var(--grid)" stroke="var(--ink-3)"/><text class="t2" x="515" y="229" text-anchor="middle">chip</text>`;
+  P_.forEach((t, i) => s += `<circle class="dot" cx="430" cy="${y(i)}" r="3"/>${tx(438, y(i), t)}`);
+  Q.forEach((t, i) => s += `<circle class="dot" cx="600" cy="${y(i)}" r="3"/>${tx(592, y(i), t, 'end')}`);
+  // izquierda
+  if (full) {s += wl([[430, y(0)], [80, y(0)]], 'var(--wsig)') + tx(84, y(0) - 10, `EN ← GPIO27 · ${at('S3')}`)}
+  else s += tx(420, y(0), 'sin conectar (pull-down interno: siempre con fuerza)', 'end', 't2');
+  if (full) {s += wl([[430, y(1)], [400, y(1)], [400, y(3)], [430, y(3)]], 'var(--w3)') + wl([[400, y(2)], [430, y(2)]], 'var(--w3)') + wl([[400, y(2)], [380, y(2)], [380, 60], [640, 60], [640, y(6)], [600, y(6)]], 'var(--w3)', 2, '5 4')
+    + tx(372, y(2), 'MS1–MS3 → VDD (1/16 de paso)', 'end')}
+  else s += tx(420, y(2), 'MS1–MS3 sin conectar → paso completo', 'end', 't2');
+  s += wl([[430, y(4)], [412, y(4)], [412, y(5)], [430, y(5)]], '#a0522d', 3);
+  s += full ? wl([[412, y(4) + 16], [390, y(4) + 16], [390, 60]], 'var(--w3)', 2, '5 4') + tx(384, y(4) + 16, 'RST + SLP puenteados y a VDD', 'end')
+    : tx(404, y(4) + 16, 'RST y SLP puenteados (cable café)', 'end');
+  s += wl([[430, y(6)], [80, y(6)]], 'var(--wsig)') + tx(84, y(6) - 10, `STEP ← GPIO25 · ${at('S1')}`);
+  s += wl([[430, y(7)], [80, y(7)]], 'var(--wsig)') + tx(84, y(7) - 10, `DIR ← GPIO26 · ${at('S2')}`);
+  // derecha: 12 V y condensador
+  s += `<rect x="880" y="26" width="170" height="54" rx="5" class="box"/><text class="tt" x="895" y="48">Adaptador 12 V</text><text class="t2" x="895" y="66">≥ 2 A · + y −</text>`;
+  s += wl([[600, y(0)], [720, y(0)], [720, 80], [920, 80]], 'var(--w12)') + wl([[600, y(1)], [760, y(1)], [760, 90], [1000, 90], [1000, 80]], 'var(--wgnd)');
+  s += `<line x1="690" y1="${y(0)}" x2="690" y2="${y(0) + 9}" stroke="var(--w12)" stroke-width="2"/><line x1="678" y1="${y(0) + 10}" x2="702" y2="${y(0) + 10}" stroke="var(--ink)" stroke-width="2.4"/><line x1="678" y1="${y(0) + 17}" x2="702" y2="${y(0) + 17}" stroke="var(--ink)" stroke-width="2.4"/><line x1="690" y1="${y(0) + 18}" x2="690" y2="${y(1)}" stroke="var(--wgnd)" stroke-width="2"/>${tx(708, y(0) + 14, 'C1 100 µF', 'start', 't2')}`;
+  // motor
+  const mc = [['2B', '#d0312d', 'rojo'], ['2A', '#2a67d4', 'azul'], ['1A', '#2f9a3f', 'verde'], ['1B', 'var(--wgnd)', 'negro']];
+  s += `<rect x="900" y="140" width="160" height="145" rx="10" class="box"/><circle cx="980" cy="212" r="38" fill="none" stroke="var(--ink)"/><text class="tt" x="915" y="162">NEMA 17</text><text class="t2" x="915" y="278">17HS4401S</text>`;
+  mc.forEach(([pn, c, nm], i) => {s += wl([[600, y(2 + i)], [900, y(2 + i)]], c) + tx(890, y(2 + i) - 8, nm, 'end', 't2')});
+  // lógica
+  s += wl([[600, y(6)], [860, y(6)]], 'var(--w3)') + tx(864, y(6), 'VDD ← 3V3 del ESP32') + tx(864, y(6) + 13, at('L1'), 'start', 't2');
+  s += wl([[600, y(7)], [860, y(7)]], 'var(--wgnd)') + tx(864, y(7) + 4, 'GND ← GND del ESP32') + tx(864, y(7) + 17, at('L2'), 'start', 't2');
+  s += '</svg>';
+  $('#drvSvg').innerHTML = s;
+  $('#drvNotes').innerHTML = `<div><h3>Igual que la guía</h3><ul style="margin:0;padding-left:1.2em;display:flex;flex-direction:column;gap:4px">
+    <li>12 V del adaptador directo a <b>VMOT</b> y <b>GND</b>, con el condensador de 100 µF entre los dos, pegado al módulo.</li>
+    <li><b>RST y SLP</b> puenteados con un cable corto.</li>
+    <li>Las dos bobinas del motor en <b>2B–2A</b> y <b>1A–1B</b>. Los colores cambian entre motores: lo que importa es que cada par mida 1–4 Ω.</li>
+    <li><b>STEP</b> y <b>DIR</b> a dos pines del microcontrolador; <b>VDD</b> y <b>GND</b> a la alimentación de la lógica.</li></ul></div>
+    <div><h3>Lo que cambia con el ESP32</h3><ul style="margin:0;padding-left:1.2em;display:flex;flex-direction:column;gap:4px">
+    <li><b>VDD a 3V3</b>, no a 5 V como en el Arduino: así el A4988 entiende bien las señales de 3,3 V del ESP32.</li>
+    <li>STEP en <b>GPIO25</b> y DIR en <b>GPIO26</b> (en el Arduino eran los pines 3 y 2).</li>
+    ${full ? '<li><b>EN a GPIO27</b> para soltar el motor con <code>d</code>, y <b>MS1–MS3 a VDD</b> para 1/16 de paso (<code>MICROSTEP = 16</code>).</li><li>RST + SLP también a VDD: en el banco del dedo el puente solo quedó flotando (~1 V) y el driver no arrancaba.</li>'
+      : '<li>EN libre: el motor queda siempre con fuerza y <code>d</code> no lo suelta. MS1–MS3 libres: paso completo, pon <code>MICROSTEP = 1</code> en el firmware (8 veces menos resolución).</li><li>Mide SLP con el multímetro: si marca menos de 2,3 V, tu módulo no trae el pull-up; une RST + SLP a VDD.</li>'}</ul></div>`;
+}
+
 /* ================= elegir Rm ================= */
 function drawRm() {
   const f1 = Math.max(0.05, +$('#rmF1').value || 0.5), f2 = Math.max(f1 * 1.5, +$('#rmF2').value || 30);
@@ -1489,7 +1614,7 @@ let rz = 0; window.addEventListener('resize', () => {clearTimeout(rz); rz = setT
 
 /* ================= arranque ================= */
 const VIEW = R.initViewer({storeKey: 'fsrFile', defaultFile: 'fsr/firmware/fsr_ensayo/fsr_ensayo.ino', order: ['fsr/firmware', 'fsr/hardware', 'fsr/analisis', 'fsr', 'web', 'tools', '.github'], copyText, saveText});
-buildSchem(); buildShield(); buildPinList(); selRow(null); buildMontaje();
+applyConf(); buildMontaje();
 document.addEventListener('click', e => {const a = e.target.closest('a[data-open]'); if (!a || a.closest('#cDoc')) return; e.preventDefault(); setTab('codigo'); VIEW.openFile(a.dataset.open)});
 addDataset('Ejemplo · banco virtual (Dragon Skin 20, Rm 10 kΩ)', exampleDataset());
 renderDS();
