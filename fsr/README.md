@@ -46,6 +46,17 @@ Cada GPIO del shield tiene una fila **G · V · S** (tierra, 3,3 V con el puente
 
 Detalles en [`hardware/conexiones.md`](hardware/conexiones.md), [`hardware/montaje.md`](hardware/montaje.md) y [`hardware/calibracion.md`](hardware/calibracion.md).
 
+## Primera prueba: solo el motor
+
+Se puede probar el motor antes de conectar los HX711 y el FSR: sus fuerzas quedan en 0 y el firmware avisa «SIN RESPUESTA» en la tara, lo cual es normal.
+
+1. Motor **desconectado**: ajusta Vref ≈ 0,8 V. Apaga, conecta el motor, y conecta primero el USB y después los 12 V.
+2. Página → **Ensayo** → **ESP32 por USB** → **Conectar**.
+3. **Motor con fuerza (e)**: el eje del motor debe quedar duro.
+4. Velocidad **1 mm/s** → **Aplicar**. Prueba con **−1** (sube) y **+1** (baja).
+5. Si sube cuando debería bajar, pon `INVERT_DIR = true` en el firmware.
+6. Mide cuánto se mueve el brazo con **+5** o **−5**: con varilla M8 son 5 mm (4 vueltas). Si no, corrige `LEAD_MM`.
+
 ## Flujo de un ensayo
 
 1. Sube `firmware/fsr_ensayo/fsr_ensayo.ino` con el paquete **esp32 3.x** y la librería **FastAccelStepper** (gin66).

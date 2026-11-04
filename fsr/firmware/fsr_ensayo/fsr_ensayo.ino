@@ -73,7 +73,7 @@ struct HX711 {
 
   void begin(int d, int s) {
     dt = d; sck = s;
-    pinMode(dt, INPUT);
+    pinMode(dt, INPUT_PULLUP);   // sin HX711 conectado, DT queda en HIGH ("no listo") y no se leen fuerzas falsas
     pinMode(sck, OUTPUT);
     digitalWrite(sck, LOW);
   }
@@ -173,6 +173,7 @@ void tare() {
   if (ok1) hx1.offset = lround(a1);
   if (ok2) hx2.offset = lround(a2);
   say(String("Tara lista. Celda 1: ") + (ok1 ? "ok" : "SIN RESPUESTA") + " · Celda 2: " + (ok2 ? "ok" : "SIN RESPUESTA"));
+  if (!ok1 || !ok2) say("(Normal si todavía no conectaste ese HX711: el motor funciona igual y esa fuerza queda en 0.)");
 }
 
 void calibrate(int n, float grams) {
