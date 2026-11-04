@@ -209,6 +209,34 @@ fieldset.pg legend{font-family:var(--mono);font-size:11px;letter-spacing:.06em;t
 .search{border:1px solid var(--rule);border-radius:4px;padding:5px 10px;background:var(--paper);width:190px;max-width:100%}
 .tk-com{color:var(--tk-com);font-style:italic}.tk-str{color:var(--tk-str)}.tk-kw{color:var(--tk-kw)}.tk-num{color:var(--tk-num)}
 .tk-pp{color:var(--tk-pp)}.tk-fn{color:var(--tk-fn)}.tk-ty{color:var(--tk-ty)}.tk-key{color:var(--tk-key)}
+
+/* pineado en el shield */
+.pinapp{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:14px;align-items:start}
+@media (max-width:1000px){.pinapp{grid-template-columns:1fr}}
+.shield{overflow-x:auto;border:1px solid var(--rule);border-radius:4px;background:var(--sheet)}
+.shield svg{display:block;width:100%;min-width:820px;height:auto}
+.shield text{font-family:var(--mono);font-size:11px;fill:var(--ink)}
+.shield .t2{fill:var(--ink-2)}.shield .tt{font-family:var(--display);font-size:15px;font-weight:600}
+.shield .lbl{font-size:11.5px}
+.prow{cursor:pointer}
+.prow:hover .rowbg{fill:var(--accent-bg)}
+.prow.on .rowbg{fill:var(--accent-bg);stroke:var(--accent)}
+.pn{stroke-width:1.2}
+.pn.free{fill:var(--sheet);stroke:var(--ink-3)}
+.pn.avoid{fill:var(--warn-bg);stroke:var(--warn);stroke-dasharray:2 2}
+.pn.k3{fill:var(--w3);stroke:var(--w3)}.pn.kg{fill:var(--wgnd);stroke:var(--wgnd)}.pn.ks{fill:var(--wsig);stroke:var(--wsig)}
+.pn.done{stroke:var(--ok);stroke-width:3}
+.lead{fill:none;stroke-width:1.6}
+.pside{display:flex;flex-direction:column;gap:10px}
+.plist{display:flex;flex-direction:column;gap:10px}
+.plist fieldset{border:1px solid var(--rule);border-radius:6px;padding:6px 10px 8px;margin:0;display:flex;flex-direction:column;gap:2px}
+.plist legend{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2);padding:0 4px}
+.plist label{display:grid;grid-template-columns:18px 30px minmax(0,1fr);gap:6px;align-items:start;font-size:13px;padding:3px 2px;cursor:pointer;border-radius:3px}
+.plist label:hover{background:var(--paper)}
+.plist label b{font-family:var(--mono);font-weight:500;font-size:12px;color:var(--accent)}
+.plist input{margin-top:3px;accent-color:var(--ok)}
+.plist input:checked~span{color:var(--ink-3);text-decoration:line-through}
+.plist label.hl{background:var(--accent-bg)}
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}
 </style>
 </head>
@@ -366,6 +394,19 @@ fieldset.pg legend{font-family:var(--mono);font-size:11px;letter-spacing:.06em;t
   <!-- CONEXIONES -->
   <section class="panel" id="p-conexiones" role="tabpanel" aria-labelledby="t-conexiones" hidden>
     <div class="card">
+      <div class="card-head"><h2>Pineado en el shield · ESP32-S de 38 pines</h2><span class="small muted mono" id="pinCount">0 / 0</span></div>
+      <div class="note bad small"><b>Antes de conectar:</b> el puente de voltaje del shield en <b>3V3</b> (mide 3,3 V entre V y G) y el conector DC del shield <b>sin usar</b>. Con 5 V en V se dañan GPIO34 y las entradas de los HX711.</div>
+      <div class="pinapp">
+        <div class="shield" id="shield"></div>
+        <div class="pside">
+          <div class="card" style="padding:12px" id="pinDetail"></div>
+          <div class="plist" id="pinList"></div>
+          <button class="btn sm" id="pinReset">Desmarcar todo</button>
+        </div>
+      </div>
+      <p class="small muted">Vista desde arriba, con la antena del ESP32 arriba y el USB abajo. Cada GPIO tiene una fila G · V · S: el orden puede cambiar en tu shield, sigue su serigrafía. Haz clic en una fila para ver qué va ahí; marca cada cable al conectarlo y el pin se pone en verde. El progreso queda guardado en este navegador.</p>
+    </div>
+    <div class="card">
       <div class="card-head"><h2>Esquemático</h2><span class="small muted">Haz clic en un cable para ver de dónde a dónde va. Los valores en magenta son las lecturas en vivo.</span></div>
       <div class="legend">
         <span style="color:var(--w12)"><i class="sw"></i>12 V</span><span style="color:var(--w3)"><i class="sw"></i>3,3 V</span><span style="color:var(--wgnd)"><i class="sw"></i>GND</span>
@@ -375,17 +416,18 @@ fieldset.pg legend{font-family:var(--mono);font-size:11px;letter-spacing:.06em;t
       <div class="detail" id="wDetail"></div>
     </div>
     <div class="two">
-      <div class="card"><h2>Pines del ESP32</h2><div class="tbl"><table><thead><tr><th>GPIO</th><th>Función</th><th>Va a</th></tr></thead><tbody>
-        <tr><td class="m">25</td><td>STEP</td><td>A4988 STEP</td></tr>
-        <tr><td class="m">26</td><td>DIR</td><td>A4988 DIR</td></tr>
-        <tr><td class="m">27</td><td>EN (LOW = con fuerza)</td><td>A4988 EN</td></tr>
-        <tr><td class="m">16 / 17</td><td>DT / SCK celda 1</td><td>HX711-1</td></tr>
-        <tr><td class="m">18 / 19</td><td>DT / SCK celda 2</td><td>HX711-2</td></tr>
-        <tr><td class="m">34</td><td>ADC1 · nodo del divisor</td><td>FSR402 + Rm</td></tr>
-        <tr><td class="m">3V3</td><td>Lógica</td><td>A4988 VDD, MS1–3, RST+SLP · HX711 VCC · FSR</td></tr>
-        <tr><td class="m">GND</td><td>Tierra común</td><td>A4988 (las dos GND) · HX711 · Rm</td></tr>
-        <tr><td class="m">USB</td><td>Alimentación y datos</td><td>Computador</td></tr>
-      </tbody></table></div></div>
+      <div class="card"><h2>Pines usados</h2><div class="tbl"><table><thead><tr><th>Pin</th><th>Posición</th><th>Fila del shield</th><th>Va a</th></tr></thead><tbody>
+        <tr><td class="m">3V3</td><td class="m">izq. 1</td><td class="m">S</td><td>A4988 VDD (y en el driver: MS1–3, RST+SLP)</td></tr>
+        <tr><td class="m">GPIO34</td><td class="m">izq. 5</td><td class="m">V · S · G</td><td>FSR402, nodo del divisor, Rm y 100 nF</td></tr>
+        <tr><td class="m">GPIO25</td><td class="m">izq. 9</td><td class="m">S · G</td><td>A4988 STEP · GND lógica</td></tr>
+        <tr><td class="m">GPIO26</td><td class="m">izq. 10</td><td class="m">S</td><td>A4988 DIR</td></tr>
+        <tr><td class="m">GPIO27</td><td class="m">izq. 11</td><td class="m">S</td><td>A4988 EN (LOW = con fuerza)</td></tr>
+        <tr><td class="m">GPIO19</td><td class="m">der. 8</td><td class="m">S</td><td>HX711-2 SCK</td></tr>
+        <tr><td class="m">GPIO18</td><td class="m">der. 9</td><td class="m">G · V · S</td><td>HX711-2 GND · VCC · DT</td></tr>
+        <tr><td class="m">GPIO17</td><td class="m">der. 11</td><td class="m">S</td><td>HX711-1 SCK</td></tr>
+        <tr><td class="m">GPIO16</td><td class="m">der. 12</td><td class="m">G · V · S</td><td>HX711-1 GND · VCC · DT</td></tr>
+        <tr><td class="m">USB</td><td class="m">abajo</td><td class="m">—</td><td>Computador (5 V y datos)</td></tr>
+      </tbody></table></div><p class="small muted">Mismos GPIO del firmware: no hay que cambiar el código. Placa en Arduino IDE: ESP32 Dev Module.</p></div>
       <div class="card"><h2>Celda de carga → HX711</h2><div class="tbl"><table><thead><tr><th>Hilo</th><th>HX711</th><th>Qué es</th></tr></thead><tbody>
         <tr><td><i class="cchip" style="background:#d0312d"></i>Rojo</td><td class="m">E+</td><td>Excitación +</td></tr>
         <tr><td><i class="cchip" style="background:#18212d"></i>Negro</td><td class="m">E−</td><td>Excitación −</td></tr>
@@ -1261,8 +1303,8 @@ const WIRES = [
   ['F3', 'cg', [[300, 615], [260, 615], [260, 628]]], ['F3', 'cg', [[260, 658], [260, 672], [400, 672]]],
   ['F4', 'cg', [[300, 615], [300, 634]]], ['F4', 'cg', [[300, 640], [300, 672]]]
 ];
-const BUSINFO = {B3: {id: 'Riel 3,3 V', de: 'ESP32 3V3', a: 'A4988 VDD · MS1–MS3 · RST+SLP · HX711-1 y -2 VCC · FSR', cal: '24 AWG', col: 'violeta', nota: 'el regulador del ESP32 da hasta ~500 mA: aquí se usan unos 10 mA'},
-  BG: {id: 'Tierra común', de: 'ESP32 GND', a: 'A4988 GND (lógica) · HX711 · Rm · y por el A4988 al GND del adaptador', cal: '24 AWG', col: 'negro', nota: 'sin tierra común el A4988 no entiende STEP/DIR'}};
+const BUSINFO = {B3: {id: 'Riel 3,3 V', de: 'Shield: fila 3V3 (A4988) y pines V de las filas 16, 18 y 34 (puente en 3V3)', a: 'A4988 VDD · MS1–MS3 · RST+SLP · HX711-1 y -2 VCC · FSR', cal: '24 AWG', col: 'violeta', nota: 'el regulador del ESP32 da hasta ~500 mA: aquí se usan unos 10 mA'},
+  BG: {id: 'Tierra común', de: 'Shield: pines G de las filas 25, 16, 18 y 34', a: 'A4988 GND (lógica) · HX711 · Rm · y por el A4988 al GND del adaptador', cal: '24 AWG', col: 'negro', nota: 'sin tierra común el A4988 no entiende STEP/DIR'}};
 function buildSchem() {
   const box = (x, y, w, h, t, sub) => `<rect class="box" x="${x}" y="${y}" width="${w}" height="${h}" rx="5"/><text class="tt" x="${x + 10}" y="${y + 20}">${t}</text>${sub ? `<text class="t2" x="${x + 10}" y="${y + 36}">${sub}</text>` : ''}`;
   const pinL = (x, y, t) => `<circle class="dot" cx="${x}" cy="${y}" r="2.6"/><text x="${x + 7}" y="${y + 4}">${t}</text>`;
@@ -1270,7 +1312,7 @@ function buildSchem() {
   const ln = (x1, y1, x2, y2) => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="var(--ink)" stroke-width="2"/>`;
   let s = `<svg viewBox="0 0 1180 700" role="img" aria-label="Esquemático del banco FSR">`;
   s += box(20, 300, 120, 70, 'Computador', 'USB: 5 V + datos');
-  s += box(200, 150, 180, 390, 'ESP32 DevKit V1', 'solo para este banco');
+  s += box(200, 150, 180, 390, 'ESP32-S 38 p + shield', 'puente V en 3V3');
   [['3V3', 210], ['GND', 235], ['GPIO25', 270], ['GPIO26', 292], ['GPIO27', 314], ['GPIO16', 350], ['GPIO17', 372], ['GPIO18', 394], ['GPIO19', 416]].forEach(([t, y]) => s += pinR(380, y, t));
   s += `<circle class="dot" cx="300" cy="540" r="2.6"/><text x="300" y="530" text-anchor="middle">GPIO34 (ADC1)</text>`;
   s += box(560, 100, 160, 240, 'A4988', '1/16 · Vref 0,8 V');
@@ -1311,6 +1353,79 @@ function updLiveSchem() {
   t('vLbl', L ? fmt(L.V, 0) + ' mV' : '—'); t('zLbl', L ? 'z = ' + fmt(L.z, 2) + ' mm' : '—'); t('rmLbl', fmt(DH.meta.rm / 1000, 1) + ' kΩ');
 }
 
+
+/* ================= pineado en el shield ================= */
+const SH = {
+  L: ['3V3', 'EN', 'GPIO36 VP', 'GPIO39 VN', 'GPIO34', 'GPIO35', 'GPIO32', 'GPIO33', 'GPIO25', 'GPIO26', 'GPIO27', 'GPIO14', 'GPIO12', 'GND', 'GPIO13', 'SD2', 'SD3', 'CMD', '5V'],
+  R: ['GND', 'GPIO23', 'GPIO22', 'TX0', 'RX0', 'GPIO21', 'GND', 'GPIO19', 'GPIO18', 'GPIO5', 'GPIO17', 'GPIO16', 'GPIO4', 'GPIO0', 'GPIO2', 'GPIO15', 'SD1', 'SD0', 'CLK'],
+  avoid: {L: [13, 16, 17, 18], R: [4, 5, 14, 15, 16, 17, 18, 19]},
+  // [lado, fila, pin, tipo, cables]
+  uses: [
+    ['L', 1, 'S', 'k3', ['L1']],
+    ['L', 5, 'V', 'k3', ['F1']], ['L', 5, 'S', 'ks', ['F2', 'F3', 'F4']], ['L', 5, 'G', 'kg', ['F3', 'F4']],
+    ['L', 9, 'S', 'ks', ['S1']], ['L', 9, 'G', 'kg', ['L2']], ['L', 10, 'S', 'ks', ['S2']], ['L', 11, 'S', 'ks', ['S3']],
+    ['R', 8, 'S', 'ks', ['H8']], ['R', 9, 'S', 'ks', ['H7']], ['R', 9, 'V', 'k3', ['H5']], ['R', 9, 'G', 'kg', ['H6']],
+    ['R', 11, 'S', 'ks', ['H4']], ['R', 12, 'S', 'ks', ['H3']], ['R', 12, 'V', 'k3', ['H1']], ['R', 12, 'G', 'kg', ['H2']]
+  ],
+  notes: {L1: 'S → A4988 VDD', L5: 'V → FSR · S → nodo + Rm · G → Rm', L9: 'S → A4988 STEP · G → A4988 GND', L10: 'S → A4988 DIR', L11: 'S → A4988 EN',
+    R8: 'S → HX711-2 SCK', R9: 'HX711-2: S → DT · V → VCC · G → GND', R11: 'S → HX711-1 SCK', R12: 'HX711-1: S → DT · V → VCC · G → GND'},
+  groups: [['Antes de empezar', ['J', 'DC', 'U1']], ['A4988', ['L1', 'L2', 'S1', 'S2', 'S3']], ['HX711-1 · celda 1', ['H1', 'H2', 'H3', 'H4']], ['HX711-2 · celda 2', ['H5', 'H6', 'H7', 'H8']], ['FSR402', ['F1', 'F2', 'F3', 'F4']]],
+  extra: {J: {de: 'Puente V del shield en 3V3', a: 'medido: 3,3 V entre V y G'}, DC: {de: 'Conector DC del shield', a: 'sin conectar (el ESP32 va por USB)'}}
+};
+let PINDONE = store.get('fsrPin', {}), PINSEL = null;
+function cableTxt(id) {const c = CABLES[id] || SH.extra[id]; return c ? `${c.de} → ${c.a}` : id}
+function buildShield() {
+  const X = {L: {G: 365, V: 395, S: 425, sock: 466, lab: 478}, R: {S: 675, V: 705, G: 735, sock: 634, lab: 622}}, y0 = 150, dy = 28, Y = r => y0 + (r - 1) * dy;
+  let s = `<svg viewBox="0 0 1100 770" role="img" aria-label="Shield del ESP32-S de 38 pines con los pines usados">`;
+  s += `<rect x="300" y="56" width="500" height="670" rx="14" fill="var(--paper)" stroke="var(--ink)" stroke-width="1.5"/><text class="tt" x="318" y="84">Base shield · 38 pines</text>`;
+  s += `<rect x="676" y="66" width="110" height="34" rx="4" fill="var(--sheet)" stroke="var(--ink-2)"/><text class="t2" x="684" y="88">V:</text><rect x="704" y="72" width="36" height="22" rx="3" fill="var(--ok)"/><text x="722" y="87" text-anchor="middle" style="fill:#fff;font-weight:600">3V3</text><text class="t2" x="762" y="88" text-anchor="middle">5V</text>`;
+  s += `<rect x="312" y="684" width="56" height="30" rx="4" fill="var(--sheet)" stroke="var(--ink-2)"/><text class="t2" x="340" y="703" text-anchor="middle">DC</text><line x1="314" y1="686" x2="366" y2="712" stroke="var(--danger)" stroke-width="2"/><text class="t2" x="378" y="703">no usar</text>`;
+  s += `<rect x="450" y="96" width="200" height="604" rx="6" fill="var(--sheet)" stroke="var(--ink)" stroke-width="1.3"/>`;
+  s += `<rect x="478" y="104" width="144" height="26" rx="3" fill="var(--grid)" stroke="var(--ink-3)" stroke-dasharray="3 3"/><text class="tt" x="550" y="122" text-anchor="middle" style="font-size:13px">ESP-32S · antena</text>`;
+  s += `<rect x="525" y="696" width="50" height="34" rx="4" fill="var(--metal)" stroke="var(--ink)"/><text x="550" y="748" text-anchor="middle" class="t2">USB → computador</text>`;
+  s += `<text class="t2" x="${X.L.G}" y="${y0 - 16}" text-anchor="middle">G</text><text class="t2" x="${X.L.V}" y="${y0 - 16}" text-anchor="middle">V</text><text class="t2" x="${X.L.S}" y="${y0 - 16}" text-anchor="middle">S</text>`;
+  s += `<text class="t2" x="${X.R.S}" y="${y0 - 16}" text-anchor="middle">S</text><text class="t2" x="${X.R.V}" y="${y0 - 16}" text-anchor="middle">V</text><text class="t2" x="${X.R.G}" y="${y0 - 16}" text-anchor="middle">G</text>`;
+  const col = {k3: 'var(--w3)', kg: 'var(--wgnd)', ks: 'var(--wsig)'};
+  ['L', 'R'].forEach(side => SH[side].forEach((lab, i) => {
+    const r = i + 1, y = Y(r), key = side + r, x = X[side], used = SH.uses.filter(u => u[0] === side && u[1] === r), avoid = SH.avoid[side].includes(r);
+    s += `<g class="prow" data-row="${key}"><rect class="rowbg" x="${side === 'L' ? 350 : 610}" y="${y - 12}" width="140" height="24" rx="4" fill="transparent" stroke="transparent"/>`;
+    ['G', 'V', 'S'].forEach(pn => {const u = used.find(q => q[2] === pn); const done = u && u[4].every(c => PINDONE[c]);
+      s += `<rect class="pn ${u ? u[3] : avoid ? 'avoid' : 'free'}${done ? ' done' : ''}" data-pin="${key}${pn}" x="${x[pn] - 7}" y="${y - 7}" width="14" height="14" rx="2"/>`});
+    s += `<circle cx="${x.sock}" cy="${y}" r="3.2" fill="var(--ink-2)"/>`;
+    s += `<text x="${x.lab}" y="${y + 4}" text-anchor="${side === 'L' ? 'start' : 'end'}" style="${used.length ? 'font-weight:600' : ''}${avoid ? ';fill:var(--warn)' : ''}">${lab}</text>`;
+    s += `<text class="t2" x="${side === 'L' ? 336 : 764}" y="${y + 4}" text-anchor="${side === 'L' ? 'end' : 'start'}">${r}</text>`;
+    if (SH.notes[key]) {const k = used[0][3];
+      s += side === 'L' ? `<polyline class="lead" stroke="${col[k]}" points="294,${y} 314,${y}"/><text class="lbl" x="290" y="${y + 4}" text-anchor="end">${SH.notes[key]}</text>`
+        : `<polyline class="lead" stroke="${col[k]}" points="786,${y} 806,${y}"/><text class="lbl" x="810" y="${y + 4}">${SH.notes[key]}</text>`}
+    s += '</g>';
+  }));
+  s += `<g transform="translate(20,720)"><rect width="14" height="14" rx="2" class="pn ks"/><text x="20" y="11">señal</text><rect x="80" width="14" height="14" rx="2" class="pn k3"/><text x="100" y="11">3,3 V</text><rect x="160" width="14" height="14" rx="2" class="pn kg"/><text x="180" y="11">GND</text>`
+    + `<rect y="22" width="14" height="14" rx="2" class="pn avoid"/><text x="20" y="33">no usar (flash o arranque)</text><rect x="200" y="22" width="14" height="14" rx="2" class="pn done" style="fill:var(--sheet)"/><text x="220" y="33">conectado</text></g>`;
+  s += '</svg>';
+  $('#shield').innerHTML = s;
+}
+function buildPinList() {
+  $('#pinList').innerHTML = SH.groups.map(([g, ids]) => `<fieldset><legend>${g}</legend>${ids.map(id => `<label data-cab="${id}"><input type="checkbox" data-pc="${id}" ${PINDONE[id] ? 'checked' : ''}><b>${id.length > 2 ? '' : id}</b><span>${esc(cableTxt(id))}</span></label>`).join('')}</fieldset>`).join('');
+  updPinCount();
+}
+function updPinCount() {const all = SH.groups.flatMap(g => g[1]); const n = all.filter(id => PINDONE[id]).length; $('#pinCount').textContent = `${n} / ${all.length} conectados`}
+function selRow(key) {
+  PINSEL = key; $$('#shield .prow').forEach(g => g.classList.toggle('on', g.dataset.row === key));
+  const side = key ? key[0] : null, r = key ? +key.slice(1) : 0, used = key ? SH.uses.filter(u => u[0] === side && u[1] === r) : [];
+  const ids = [...new Set(used.flatMap(u => u[4]))];
+  $$('#pinList label').forEach(l => l.classList.toggle('hl', ids.includes(l.dataset.cab)));
+  if (!key) {$('#pinDetail').innerHTML = '<p class="small muted">Haz clic en una fila del shield para ver qué cables van ahí.</p>'; return}
+  const lab = SH[side][r - 1], avoid = SH.avoid[side].includes(r);
+  $('#pinDetail').innerHTML = `<h3>${esc(lab)} <span class="small muted mono">${side === 'L' ? 'izquierda' : 'derecha'} · fila ${r}</span></h3>` +
+    (used.length ? `<dl class="kv">${used.map(u => `<dt>${u[2]}</dt><dd style="font-family:var(--body);font-size:13px">${u[4].map(c => `<b class="mono">${c}</b> ${esc(cableTxt(c))}`).join('<br>')}</dd>`).join('')}</dl>`
+      : `<p class="small muted">${avoid ? 'No usar: este pin es de la memoria flash o decide cómo arranca el ESP32.' : 'Libre en este banco.'}</p>`);
+}
+$('#shield').addEventListener('click', e => {const g = e.target.closest('.prow'); selRow(g && g.dataset.row !== PINSEL ? g.dataset.row : null)});
+$('#pinList').addEventListener('change', e => {const id = e.target.dataset.pc; if (!id) return; PINDONE[id] = e.target.checked; store.set('fsrPin', PINDONE); const k = PINSEL; buildShield(); selRow(k); updPinCount()});
+$('#pinList').addEventListener('mouseover', e => {const l = e.target.closest('label[data-cab]'); if (!l) return; const id = l.dataset.cab;
+  $$('#shield .prow').forEach(g => {const side = g.dataset.row[0], r = +g.dataset.row.slice(1); g.classList.toggle('on', SH.uses.some(u => u[0] === side && u[1] === r && u[4].includes(id)) || g.dataset.row === PINSEL)})});
+$('#pinList').addEventListener('mouseleave', () => selRow(PINSEL));
+$('#pinReset').onclick = () => {PINDONE = {}; store.set('fsrPin', PINDONE); buildShield(); buildPinList(); selRow(PINSEL)};
 /* ================= elegir Rm ================= */
 function drawRm() {
   const f1 = Math.max(0.05, +$('#rmF1').value || 0.5), f2 = Math.max(f1 * 1.5, +$('#rmF2').value || 30);
@@ -1374,7 +1489,7 @@ let rz = 0; window.addEventListener('resize', () => {clearTimeout(rz); rz = setT
 
 /* ================= arranque ================= */
 const VIEW = R.initViewer({storeKey: 'fsrFile', defaultFile: 'fsr/firmware/fsr_ensayo/fsr_ensayo.ino', order: ['fsr/firmware', 'fsr/hardware', 'fsr/analisis', 'fsr', 'web', 'tools', '.github'], copyText, saveText});
-buildSchem(); buildMontaje();
+buildSchem(); buildShield(); buildPinList(); selRow(null); buildMontaje();
 document.addEventListener('click', e => {const a = e.target.closest('a[data-open]'); if (!a || a.closest('#cDoc')) return; e.preventDefault(); setTab('codigo'); VIEW.openFile(a.dataset.open)});
 addDataset('Ejemplo · banco virtual (Dragon Skin 20, Rm 10 kΩ)', exampleDataset());
 renderDS();

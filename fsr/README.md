@@ -19,7 +19,8 @@ Segundo banco del proyecto, **independiente del banco del dedo y con su propio E
 
 | Cant. | Componente | Uso |
 |---|---|---|
-| 1 | ESP32 DevKit V1 (**otro**, no el del dedo) | Control y adquisición, alimentado por USB desde el computador |
+| 1 | ESP32-S de **38 pines** (**otro**, no el del dedo) | Control y adquisición, alimentado por USB desde el computador |
+| 1 | **Base shield** para ESP32 de 38 pines (filas G · V · S) | Conexiones con dupont; puente V en **3V3** y conector DC sin usar |
 | 1 | NEMA 17 **17HS4401S** (1,7 A, 0,42 N·m) | Mueve el tornillo del punzón |
 | 1 | Driver **A4988** con disipador | 1/16 de paso |
 | 2 | Celda de carga tipo barra **10 kg** | Fuerza real sobre la cúpula |
@@ -30,7 +31,9 @@ Segundo banco del proyecto, **independiente del banco del dedo y con su propio E
 | 1 | Electrolítico **100 µF 25–35 V** | En VMOT del A4988 |
 | 1 | Adaptador **12 V ≥ 2 A** | Potencia del motor |
 
-## Pines del ESP32
+## Pines del ESP32-S (sobre el shield)
+
+Cada GPIO del shield tiene una fila **G · V · S** (tierra, 3,3 V con el puente en 3V3, señal). Mapa completo con la posición de cada pin en [`hardware/conexiones.md`](hardware/conexiones.md) y en la pestaña **Conexiones** de la página.
 
 | GPIO | Va a |
 |---|---|
@@ -38,8 +41,8 @@ Segundo banco del proyecto, **independiente del banco del dedo y con su propio E
 | 16 / 17 | HX711 de la celda 1: DT / SCK |
 | 18 / 19 | HX711 de la celda 2: DT / SCK |
 | 34 | Nodo del divisor del FSR (ADC1) |
-| 3V3 | A4988 VDD, MS1–MS3, RST+SLP · VCC de los dos HX711 · FSR |
-| GND | Común con el GND del adaptador de 12 V |
+| 3V3 / V | A4988 VDD, MS1–MS3, RST+SLP (fila 3V3) · VCC de los HX711 y FSR (pin V de su fila) |
+| G | GND común: A4988 (fila 25), HX711 (filas 16 y 18), Rm (fila 34), y por el A4988 al GND de 12 V |
 
 Detalles en [`hardware/conexiones.md`](hardware/conexiones.md), [`hardware/montaje.md`](hardware/montaje.md) y [`hardware/calibracion.md`](hardware/calibracion.md).
 

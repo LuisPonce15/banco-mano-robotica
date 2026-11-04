@@ -1,6 +1,8 @@
 // ============================================================
 //  Banco FSR · caracterización de un FSR402 dentro de silicona
-//  ESP32 DevKit V1 + A4988 + NEMA 17 (17HS4401S) + 2× HX711 + 2 celdas de 10 kg
+//  ESP32-S de 38 pines (NodeMCU-32S / DevKitC) sobre base shield
+//  + A4988 + NEMA 17 (17HS4401S) + 2× HX711 + 2 celdas de 10 kg
+//  Placa en Arduino IDE: ESP32 Dev Module (o NodeMCU-32S)
 //
 //  El punzón (brazo rosado) baja con el tornillo y presiona la cúpula de
 //  silicona que tiene el FSR adentro. Las celdas de carga miden la fuerza
@@ -48,6 +50,9 @@ const float VCC_MV        = 3300.0; // alimentación del divisor del FSR
 const float ACCEL_MM_S2   = 5.0;
 
 // ---------------- PINES ----------------
+// En el shield cada GPIO tiene una fila G · V · S. Puente V en 3V3.
+// Izquierda: 3V3 (1), GPIO34 (5), GPIO25 (9), GPIO26 (10), GPIO27 (11)
+// Derecha:   GPIO19 (8), GPIO18 (9), GPIO17 (11), GPIO16 (12)
 const int STEP_PIN = 25, DIR_PIN = 26, EN_PIN = 27;  // A4988
 const int HX1_DT = 16, HX1_SCK = 17;                  // HX711 de la celda 1
 const int HX2_DT = 18, HX2_SCK = 19;                  // HX711 de la celda 2
