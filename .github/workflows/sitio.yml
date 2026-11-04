@@ -9,7 +9,7 @@ on:
 jobs:
   al-dia:
     name: docs/index.html está al día
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
