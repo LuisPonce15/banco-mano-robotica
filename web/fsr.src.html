@@ -422,8 +422,9 @@ details.pre>summary h2{flex:1 1 auto}
         <p class="small muted">Las grabaciones de la pestaña Ensayo aparecen aquí. También puedes abrir un CSV guardado antes o hecho con <code>registrar_serial.py</code>.</p>
         <div class="pf"><label for="aY">Eje vertical</label><select id="aY"><option value="V">Voltaje del FSR (mV)</option><option value="R">Resistencia del FSR (Ω, log)</option><option value="G">Conductancia 1/R (µS)</option></select></div>
         <div class="pf"><label for="aFmin">Fuerza mínima para el ajuste (N)</label><input id="aFmin" type="number" value="0.2" step="0.1"></div>
-        <div class="pf"><label for="aLag">Retraso de las celdas HX711 (ms)</label><input id="aLag" type="number" value="250" step="25" min="0"></div>
-        <p class="small muted">El HX711 a 10 muestras/s entrega cada fuerza ~250 ms tarde (su filtro asienta en 400 ms); el FSR llega casi al instante. La página adelanta la fuerza ese tiempo para que cada fuerza quede con su voltaje y su posición. 0 = sin corregir.</p>
+        <div class="pf"><label for="aLag">Retraso de las celdas HX711 (ms)</label><input id="aLag" type="number" value="200" step="25" min="0"></div>
+        <p class="small muted">El HX711 a 10 muestras/s entrega cada fuerza ~200 ms tarde (su filtro tarda ~0,3 s en asentarse); el FSR llega casi al instante. La página adelanta la fuerza ese tiempo para que cada fuerza quede con su voltaje y su posición. 0 = sin corregir.</p>
+        <p class="small" id="lagEst"></p>
         <div class="pf"><label for="aCol">Colorear por</label><select id="aCol"><option value="fase">Carga / descarga</option><option value="ciclo">Ciclo</option></select></div>
         <fieldset class="pg"><legend>Contacto y rigidez</legend>
           <div class="f2">
@@ -781,8 +782,8 @@ class VirtualBench {
     const F1 = this.sum ? (F + plat) * (1 - P.share) + cal[0] : F + plat + cal[0];
     const F2 = this.sum ? (F + plat) * P.share + cal[1] : F + cal[1];
     const sig = P.hxRate >= 80 ? 62 : 35, kk = [P.kErr1, P.kErr2];
-    // filtro interno del HX711: cada dato es el promedio de los últimos 4 periodos (asienta en 400 ms a 10/s → ~200 ms de retraso)
-    const q = this.hq || (this.hq = {a: [], s1: 0, s2: 0}), win = 4 / P.hxRate; q.a.push([this.t, F1, F2]); q.s1 += F1; q.s2 += F2;
+    // filtro interno del HX711: cada dato es el promedio de los últimos 3 periodos (asienta en ~300 ms a 10/s → ~200 ms de retraso con la espera de la lectura)
+    const q = this.hq || (this.hq = {a: [], s1: 0, s2: 0}), win = 3 / P.hxRate; q.a.push([this.t, F1, F2]); q.s1 += F1; q.s2 += F2;
     while (q.a.length > 1 && this.t - q.a[0][0] > win) {const o = q.a.shift(); q.s1 -= o[1]; q.s2 -= o[2]}
     const Fm = [q.s1 / q.a.length, q.s2 / q.a.length];
     [0, 1].forEach(i => {const h = this.hx[i]; if (this.t >= h.next) {h.next = this.t + 1 / P.hxRate; h.raw = Math.round(h.off + 21898 * kk[i] * Fm[i] + sig * gauss()); h.ready = true}});
@@ -1395,6 +1396,21 @@ function alignForce(rows, lagS) {   // la fuerza que llega en t + lag es la que 
     const s = rows[j]; out.push(Object.assign({}, rows[i], {f1: s.f1, f2: s.f2, F: s.F}))}
   return out;
 }
+// Estima el retraso de las celdas: el que hace que la carga y la descarga del FSR coincidan a la misma fuerza.
+// (El FSR responde al instante; si la fuerza llega tarde, la carga queda corrida respecto de la descarga.)
+function loopDiff(A) {
+  const up = A.filter(r => r.ph === 1 && r.V > 200), dn = A.filter(r => r.ph === 3 && r.V > 200); if (up.length < 10 || dn.length < 10) return null;
+  const Fm = Math.max(...up.map(r => r.F)), w = Math.max(0.5, Fm / 20), d = [];
+  for (let lo = w; lo < Fm; lo += w) {const u = up.filter(r => r.F >= lo && r.F < lo + w), v = dn.filter(r => r.F >= lo && r.F < lo + w);
+    if (u.length >= 3 && v.length >= 3) d.push(u.reduce((s, r) => s + r.V, 0) / u.length - v.reduce((s, r) => s + r.V, 0) / v.length)}
+  return d.length >= 4 ? d.reduce((s, x) => s + x, 0) / d.length : null;
+}
+function estimateLag(raw) {
+  let prev = null;
+  for (let L = 0; L <= 0.6001; L += 0.01) {const d = loopDiff(alignForce(raw, L)); if (d == null) continue;
+    if (prev && prev.d > 0 && d <= 0) return prev.L + (L - prev.L) * prev.d / (prev.d - d); prev = {L, d}}
+  return null;
+}
 function median(a) {const q = a.filter(Number.isFinite).sort((x, y) => x - y), n = q.length; return n ? (n % 2 ? q[(n - 1) / 2] : (q[n / 2 - 1] + q[n / 2]) / 2) : NaN}
 const robustSd = a => {const m = median(a); return 1.4826 * median(a.map(v => Math.abs(v - m)))};
 function contactCycle(rows, sg, o) {
@@ -1416,7 +1432,8 @@ function contactCycle(rows, sg, o) {
   if (baseF.length >= 3 && dFb > Math.max(4 * Fs, 0.02)) flags.push('la fuerza cambia en la base: el punzón ya tocaba al empezar');
   const vB = linfit(R_.slice(0, nBase).map(r => r.z), baseV), dVb = vB.b * bw;
   if (Math.abs(dVb) > Math.max(4 * Vs, 0.3 * o.vth)) flags.push(`el FSR ${dVb < 0 ? 'todavía bajaba' : 'subía'} en la base (${fmt(dVb, 0)} mV): no estaba en reposo`);
-  if (Math.abs(Fb) > 0.05) flags.push(`fuerza en la base ${fmt(Fb, 3)} N: revisa la tara o si quedó apoyado`);
+  if (Math.abs(Fb) > 0.3) flags.push(`fuerza en la base ${fmt(Fb, 2)} N: revisa la tara o si quedó apoyado`);
+  else if (Math.abs(Fb) > 0.03) warns.push(`base de las celdas en ${fmt(Fb, 3)} N (con el motor andando suele subir ~0,05 N por la vibración; se resta)`);
   // 4) h₁: primera muestra nueva de las celdas sobre la base + máx(k·σ, mínimo), confirmada por las 2 siguientes
   const Fth = Fb + Math.max(o.fk * Fs, o.fmin), fi = fresh.filter(i => i >= nBase);
   let ic = -1; for (let k = 0; k + 2 < fi.length; k++) if (R_[fi[k]].F > Fth && R_[fi[k + 1]].F > Fth && R_[fi[k + 2]].F > Fth) {ic = fi[k]; break}
@@ -1465,8 +1482,11 @@ function contactCycle(rows, sg, o) {
   out.pts = pts;
   const unl = rows.filter(r => r.cy === sg.cy && r.ph === 3 && r.z > h1).map(r => {const F = r.F - Fb; return {d: r.z - h1 - o.C * F, F}}).sort((a, b) => a.d - b.d);
   const area = P_ => {const q = P_.slice().sort((a, b) => a.d - b.d); let A = 0; for (let i = 1; i < q.length; i++) A += (q[i].d - q[i - 1].d) * (q[i].F + q[i - 1].F) / 2; return A};
-  const ptsAll = fresh.filter(i => zF[i] > h1).map(i => {const F = R_[i].F - Fb; return {d: zF[i] - h1 - o.C * F, F}}).filter(p => p.d > 0);
-  if (unl.length > 5 && ptsAll.length > 5) {const Wl = area(ptsAll), Wu = area(unl); out.Wl = Wl; out.Wd = Wl - Wu}
+  // carga = bajada + pausa abajo (si el límite del FSR la cortó, la fuerza sigue subiendo en la pausa mientras llega del HX711)
+  const ptsAll = rows.filter(r => r.cy === sg.cy && (r.ph === 1 || r.ph === 2) && r.z > h1).map(r => {const F = r.F - Fb; return {d: r.z - h1 - o.C * F, F}}).filter(p => p.d > 0);
+  if (unl.length > 5 && ptsAll.length > 5) {const Wl = area(ptsAll), Wu = area(unl), dmax = Math.max(...ptsAll.map(p => p.d));
+    if (Wl - Wu >= 0 && dmax > 4 * out.lagmm) {out.Wl = Wl; out.Wd = Wl - Wu}
+    else warns.push(`energía disipada no medible: el recorrido con fuerza (${fmt(dmax, 2)} mm) es poco frente al retraso de las celdas (${fmt(out.lagmm, 2)} mm a esta velocidad)`)}
   out.warns = warns; out.auto = !flags.length;
   return out;
 }
@@ -1523,7 +1543,8 @@ function drawContact(ca) {
 $('#contactTbl').addEventListener('change', e => {const cy = e.target.dataset.cyc; if (cy == null) return; USE_OVR.set((DS[curDS] ? DS[curDS].name : '') + '|' + cy, e.target.checked); analyze()});
 $('#aCyc').addEventListener('change', () => {CYC_SEL = +$('#aCyc').value; analyze()});
 $('#aR').value = P.Rd; $('#aDf').value = +(0.15 * P.Rd).toFixed(2); $('#aC').value = RIG.C;
-const ATH = Object.assign({vth: 50, vn: 5, fth: 0.01, lag: 250}, store.get('fsrThr', {})); $('#aVth').value = ATH.vth; $('#aVn').value = ATH.vn; $('#aFth').value = ATH.fth; $('#aLag').value = ATH.lag;
+const ATH = Object.assign({vth: 50, vn: 5, fth: 0.01, lag: 200}, store.get('fsrThr', {}));
+if (!ATH.lagV2) {if (ATH.lag === 250) ATH.lag = 200; ATH.lagV2 = true; store.set('fsrThr', ATH)}   // el valor medido con el banco real es ~200 ms $('#aVth').value = ATH.vth; $('#aVn').value = ATH.vn; $('#aFth').value = ATH.fth; $('#aLag').value = ATH.lag;
 ['aVth', 'aVn', 'aFth', 'aLag'].forEach(id => $('#' + id).addEventListener('change', () => {ATH.vth = +$('#aVth').value || 50; ATH.vn = Math.max(1, Math.round(+$('#aVn').value || 5)); ATH.fth = Math.max(0.001, +$('#aFth').value || 0.01); ATH.lag = Math.max(0, +$('#aLag').value || 0); store.set('fsrThr', ATH); analyze()}));
 $('#thrSens').addEventListener('click', e => {const b = e.target.closest('[data-thr]'); if (!b) return; $('#aVth').value = b.dataset.thr; $('#aVth').dispatchEvent(new Event('change'))});
 function updRigNote() {const C = +$('#aC').value || 0; $('#aRigNote').textContent = C ? `C = ${fmt(C, 4)} mm/N → rigidez del montaje ${fmt(1 / C, 0)} N/mm${RIG.from ? ' (de «' + RIG.from + '»)' : ''}.` : 'C = 0: sin corrección. Mídela una vez con un bloque rígido en lugar de la cúpula.'}
@@ -1538,6 +1559,9 @@ let AN = null;
 function analyze() {
   const d = DS[curDS];
   if (!d) {$('#kpis').innerHTML = ''; $('#aNotes').textContent = ''; ['cA', 'cAT', 'cAD'].forEach(id => {const c = canvasCtx($('#' + id)); if (c) {c.g.fillStyle = CSSV['--ink-2']; c.g.font = '13px Barlow,sans-serif'; c.g.textAlign = 'center'; c.g.fillText('Sin datos', c.w / 2, c.h / 2)}}); return}
+  if (d.lagEst === undefined) d.lagEst = estimateLag(d.rows);
+  $('#lagEst').innerHTML = d.lagEst != null ? `Con este ensayo, la carga y la descarga coinciden con un retraso de <b>${fmt(d.lagEst * 1000, 0)} ms</b>. <button class="btn sm" id="lagUse">Usar ${fmt(d.lagEst * 1000, 0)} ms</button>` : '';
+  if ($('#lagUse')) $('#lagUse').onclick = () => {$('#aLag').value = Math.round(d.lagEst * 1000); $('#aLag').dispatchEvent(new Event('change'))};
   const rows = alignForce(d.rows, Math.max(0, +$('#aLag').value || 0) / 1000), fmin = +$('#aFmin').value || 0.2, ca = contactAnalysis(rows), vOn = ca.used.length ? median(ca.used.map(c => c.Vth)) : 0;
   const ok = rows.filter(r => r.F > fmin && r.V > vOn && Number.isFinite(r.R) && r.R > 0 && r.R < 4e6);   // el ajuste del sensor solo usa lo que el FSR ya ve
   let pw = null, ln = null;
