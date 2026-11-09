@@ -24,6 +24,7 @@ jobs:
               - firmware/banco_fase1
               - fsr/firmware/fsr_ensayo
               - fsr/firmware/fsr_lectura
+              - fsr/firmware/hx711_prueba
           # El paquete 2.x solo se prueba con banco_prueba: banco_fase1 y
           # fsr_ensayo usan librerías actuales que piden el 3.x.
           - core: "2.0.17"
@@ -34,6 +35,7 @@ jobs:
             sketches: |
               - firmware/banco_prueba
               - fsr/firmware/fsr_lectura
+              - fsr/firmware/hx711_prueba
     steps:
       - uses: actions/checkout@v5
 

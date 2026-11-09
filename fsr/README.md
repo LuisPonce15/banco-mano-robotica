@@ -54,6 +54,10 @@ Detalles en [`hardware/conexiones.md`](hardware/conexiones.md), [`hardware/monta
 - Escribe `t` en el Monitor Serie para ver V, R_FSR y conductancia en texto, o `w` para verlo en la pestaña **Ensayo** de la página.
 - `b` repite la línea base; `r 47000` si cambias Rm.
 
+## Prueba de las celdas
+
+`firmware/hx711_prueba/hx711_prueba.ino` revisa si cada HX711 responde, si la celda está saturada (hilos mal puestos) y cuánto ruido hay. Después muestra el cambio en gramos aproximados al poner peso. `p` para el Serial Plotter, `t` tara, `d` repetir el diagnóstico.
+
 ## Primera prueba: solo el motor
 
 Se puede probar el motor antes de conectar los HX711 y el FSR: sus fuerzas quedan en 0 y el firmware avisa «SIN RESPUESTA» en la tara, lo cual es normal.
