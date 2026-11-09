@@ -84,9 +84,10 @@ Pasos:
 1. **Una sola vez, flexibilidad del montaje (C):** pon un bloque rígido (aluminio, acero) en lugar de la cúpula, `h`, y el ensayo **Contacto y rigidez** con 1 mm de profundidad y límite de fuerza bajo (`f 20`). En Análisis, **Usar este ensayo como montaje rígido**: C = pendiente de z contra F. Queda guardado para los siguientes análisis. Sin esto, la silicona parece más blanda de lo que es.
 2. Monta la cúpula y haz `t` (tara) sin contacto.
 3. `vl 2000`: el motor empieza a subir apenas el FSR responde bien. Con `vl 2500` este FSR no llega al límite (su voltaje se aplana cerca de 2450 mV) y el motor sigue empujando: ahí aparece el ruido fuerte y el movimiento perdido.
-4. `h` (contacto), `m -2` (sube 2 mm más) y `z` (z = 0 ahí), esperando a que termine cada uno. Así la bajada empieza con el punzón en el aire y el contacto queda cerca de z = 2 mm. Si en Análisis la columna «Revisión» dice «fuerza en la base», el punzón todavía tocaba: usa `m -3` o `m -4`.
-5. Ensayo **Contacto y rigidez**: `r 3 0.1 2 3` (hasta 1 mm más allá del contacto, a 0,1 mm/s, 3 ciclos; el límite del FSR lo corta antes). A 0,1 mm/s el retraso del HX711 (~250 ms) equivale a 0,025 mm; a 0,5 mm/s son 0,125 mm y Δh queda indeterminado.
-6. Para los ensayos normales, vuelve a hacer `h`.
+4. `h` (contacto), `m -3` (sube 3 mm más) y `z` (z = 0 ahí), esperando a que termine cada uno. Así el ensayo empieza con el punzón en el aire.
+5. **Por escalones** (recomendado): `p 0.05 99 1 0.2`. Baja de a 0,05 mm y se queda quieto 1 s en cada escalón, hasta 4,95 mm o el límite del FSR, y vuelve igual (~4 min). En cada escalón la página promedia la fuerza y el FSR después de 0,45 s quieto: el retraso del HX711 (~0,2 s) no afecta y Δh sale con ± 0,05 mm (un escalón). Con ciclos continuos (`r`) a 0,5 mm/s, ese retraso equivale a 0,1 mm y la fuerza en h₂ queda muy incierta.
+6. **Comprobación con papel** (opcional): con el motor quieto, una tira de papel sobre la cúpula; baja con −0,05 hasta que quede prensada y anota z (toque real, sin depender de las celdas). Sigue bajando hasta que suba el FSR y anota z otra vez.
+6b. Para los ensayos normales, vuelve a hacer `h`.
 7. En **Análisis**: pon el radio R de la cúpula y ν (0,49 para silicona). La tarjeta **Contacto y respuesta del FSR** muestra h₁, h₂, Δh, vueltas, Δt, F al responder y E por ciclo; los indicadores de arriba dan la media ± desviación.
 8. **Llevar el retardo al modelo virtual** copia la media de Δh al parámetro «Retardo» del modelo (pestaña Modelo). En el modelo, hasta esa indentación el FSR no recibe fuerza y después recibe solo la que se suma desde ahí.
 

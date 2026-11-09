@@ -361,19 +361,22 @@ details.pre>summary h2{flex:1 1 auto}
           </div>
           <div id="testC" hidden style="display:flex;flex-direction:column;gap:6px">
             <div class="f2">
-              <div class="pf"><label for="ctD">Profundidad máx. (mm)</label><input id="ctD" type="number" value="3" step="0.5"></div>
-              <div class="pf"><label for="ctV">Velocidad (mm/s)</label><input id="ctV" type="number" value="0.1" step="0.01"></div>
-              <div class="pf"><label for="ctP">Pausa (s)</label><input id="ctP" type="number" value="2" step="0.5"></div>
-              <div class="pf"><label for="ctN">Ciclos</label><input id="ctN" type="number" value="3" step="1" min="1"></div>
+              <div class="pf"><label for="ctD">Paso (mm)</label><input id="ctD" type="number" value="0.05" step="0.01"></div>
+              <div class="pf"><label for="ctV">Escalones (máx. 99)</label><input id="ctV" type="number" value="99" step="1"></div>
+              <div class="pf"><label for="ctP">Quieto en cada escalón (s)</label><input id="ctP" type="number" value="1" step="0.5"></div>
+              <div class="pf"><label for="ctN">Velocidad entre escalones (mm/s)</label><input id="ctN" type="number" value="0.2" step="0.1"></div>
             </div>
-            <div class="small">Antes, en orden (cada botón manda el comando):
+            <div class="small"><b>Recomendado: por escalones</b> (cada botón manda el comando; espera a que termine cada uno):
               <ol style="margin:4px 0 0 18px;padding:0;display:flex;flex-direction:column;gap:3px">
-                <li><button class="btn sm" data-send="vl 2000">vl 2000</button> límite del FSR: apenas el FSR responde, empieza a subir. Así el motor no empuja de más.</li>
-                <li><button class="btn sm" data-send="h">h</button> buscar el contacto (z = 0 y sube 0,5 mm).</li>
-                <li><button class="btn sm" data-send="m -2">m -2</button> subir 2 mm más, para empezar con el punzón en el aire.</li>
-                <li><button class="btn sm" data-send="z">z</button> z = 0 aquí: el contacto queda cerca de z = 2 mm. Por eso la profundidad es 3 mm (1 mm de margen; el límite del FSR lo para antes).</li>
+                <li>Punzón por lo menos 1 cm arriba y <button class="btn sm" data-send="t">t</button> tara.</li>
+                <li><button class="btn sm" data-send="vl 2000">vl 2000</button> límite del FSR: apenas responde bien, el motor sube. Así no se fuerza.</li>
+                <li><button class="btn sm" data-send="h">h</button> buscar el contacto (z = 0 donde las celdas pasan 0,05 N y sube 0,5 mm).</li>
+                <li><button class="btn sm" data-send="m -3">m -3</button> subir 3 mm más y <button class="btn sm" data-send="z">z</button> z = 0 ahí. Si crees que la cúpula se deforma antes de que las celdas lo vean, sube más (m −5).</li>
+                <li>Marca «Grabar automáticamente» e <b>Iniciar ensayo</b> (manda <code>p 0.05 99 1 0.2</code>): baja de a 0,05 mm, se queda quieto 1 s en cada escalón (hasta 4,95 mm o el límite del FSR) y vuelve igual. Tarda ~4 min.</li>
               </ol>
-              Después, para los ensayos normales, vuelve a hacer <b>h</b>. El resultado sale en <b>Análisis → Contacto y rigidez</b>; si la columna «Revisión» dice «fuerza en la base», el punzón todavía tocaba: sube más (m −3).</div>
+              Con el motor quieto, las celdas y el FSR se leen ya asentados: el retraso del HX711 no afecta y Δh sale con ± 0,05 mm. El resultado aparece en <b>Análisis → Contacto y respuesta del FSR → Escalones</b>.
+              <br><b>Comprobación con papel</b> (opcional): con el motor quieto, pon una tira de papel sobre la cúpula y baja con −0,05 hasta que el papel quede prensado; anota z. Ese es el toque real, sin depender de las celdas. Después baja hasta que el FSR suba y anota z otra vez.
+              <br>Después, para los ensayos normales, vuelve a hacer <b>h</b>.</div>
           </div>
           <div class="f2" id="testP" hidden>
             <div class="pf"><label for="pS">Paso (mm)</label><input id="pS" type="number" value="0.05" step="0.01"></div>
@@ -461,6 +464,10 @@ details.pre>summary h2{flex:1 1 auto}
             <div class="chart pad-r"><button class="btn pngb dl" data-png="cAK" title="Guardar esta gráfica como PNG">PNG</button><h3>Rigidez tangente</h3><div class="lg" id="lgAK"></div><canvas id="cAK" aria-label="Rigidez tangente contra indentación"></canvas></div>
           </div>
           <div class="tbl"><table><thead><tr><th>Usar</th><th>Ciclo</th><th>h₁ contacto (mm)</th><th>h₂ FSR (mm)</th><th>Δh (mm)</th><th>Vueltas</th><th>Δt (s)</th><th>V en h₂ (mV)</th><th>F al responder (N)</th><th>E Hertz (kPa)</th><th>Energía disipada (mJ)</th><th>Revisión</th></tr></thead><tbody id="contactTbl"></tbody></table></div>
+          <div id="stepBox" hidden style="display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--rule);padding-top:10px;margin-top:4px">
+            <div class="chart pad-r"><button class="btn pngb dl" data-png="cAS" title="Guardar esta gráfica como PNG">PNG</button><h3>Escalones: fuerza y FSR con el motor quieto</h3><div class="lg" id="lgAS"></div><canvas id="cAS" aria-label="Fuerza y voltaje del FSR asentados en cada escalón contra z"></canvas></div>
+            <p class="small" id="stepNote"></p>
+          </div>
           <div class="small"><b>Δh según el umbral del FSR</b> (mediana de los ciclos usados; toca uno para usarlo):<div class="thrs" id="thrSens"></div></div>
           <p class="small muted" id="contactNote"></p>
         </div>
@@ -1318,7 +1325,7 @@ $('#vSet').onclick = () => send('v ' + (+$('#vMan').value || 1));
 $$('[data-send]').forEach(b => b.onclick = () => send(b.dataset.send));
 $$('#testSeg button').forEach(b => b.onclick = () => {$$('#testSeg button').forEach(x => x.setAttribute('aria-pressed', x === b)); $('#testR').hidden = b.dataset.test !== 'r'; $('#testP').hidden = b.dataset.test !== 'p'; $('#testC').hidden = b.dataset.test !== 'c'; updTestCmd()});
 function testCmd() {const t = $('#testSeg [aria-pressed="true"]').dataset.test;
-  if (t === 'c') return `r ${+$('#ctD').value} ${+$('#ctV').value} ${+$('#ctP').value} ${Math.round(+$('#ctN').value)}`;
+  if (t === 'c') return `p ${+$('#ctD').value} ${Math.min(99, Math.round(+$('#ctV').value))} ${+$('#ctP').value} ${+$('#ctN').value}`;
   return t === 'r' ? `r ${+$('#rD').value} ${+$('#rV').value} ${+$('#rP').value} ${Math.round(+$('#rN').value)}` : `p ${+$('#pS').value} ${Math.round(+$('#pN').value)} ${+$('#pP').value} ${+$('#pV').value}`}
 function updTestCmd() {$('#testCmd').textContent = 'Comando: ' + testCmd()}
 ['rD', 'rV', 'rP', 'rN', 'pS', 'pN', 'pP', 'pV', 'ctD', 'ctV', 'ctP', 'ctN'].forEach(id => $('#' + id).addEventListener('input', updTestCmd)); updTestCmd();
@@ -1411,6 +1418,53 @@ function estimateLag(raw) {
     if (prev && prev.d > 0 && d <= 0) return prev.L + (L - prev.L) * prev.d / (prev.d - d); prev = {L, d}}
   return null;
 }
+/* ---------- ensayo por escalones: cada punto con el motor quieto (sin el problema del retraso del HX711) ---------- */
+function stepAnalysis(rows, o) {
+  const holds = []; let cur = null;
+  rows.forEach(r => {if (r.ph === 2 || r.ph === 4) {if (!cur || cur.ph !== r.ph) {cur = {ph: r.ph, cy: r.cy, rs: []}; holds.push(cur)} cur.rs.push(r)} else cur = null});
+  const cnt = {}; holds.forEach(h => {if (h.ph === 2) cnt[h.cy] = (cnt[h.cy] || 0) + 1}); const cyS = +Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a])[0];   // el ciclo con más pausas (un ensayo de escalones es un solo ciclo)
+  const H = holds.map(h => {const t0 = h.rs[0].t, keep = h.rs.filter(r => r.t - t0 >= 0.45);   // el HX711 tarda ~0,3 s en asentarse
+    if (keep.length < 3) return null; const fr = keep.filter((r, i) => i === 0 || r.F !== keep[i - 1].F);
+    return {ph: h.ph, cy: h.cy, z: median(keep.map(r => r.z)), F: fr.reduce((a, r) => a + r.F, 0) / fr.length, Fsd: robustSd(fr.map(r => r.F)), nF: fr.length, V: keep.reduce((a, r) => a + r.V, 0) / keep.length}}).filter(Boolean);
+  const up = H.filter(h => h.ph === 2 && h.cy === cyS).sort((a, b) => a.z - b.z), dn = H.filter(h => h.ph === 4 && h.cy === cyS).sort((a, b) => a.z - b.z);
+  if (up.length < 8) return null;
+  const step = median(up.slice(1).map((h, i) => h.z - up[i].z));
+  if (!(step > 0.002) || up[up.length - 1].z - up[0].z < 6 * step) return null;
+  // base: los escalones del principio, en el aire (antes de que cambie la fuerza o el FSR)
+  const nb = Math.max(3, Math.min(10, Math.floor(up.length / 4))), base = up.slice(0, nb);
+  const Fb = median(base.map(h => h.F)), sF = Math.max(robustSd(base.map(h => h.F)), median(base.map(h => h.Fsd / Math.sqrt(h.nF))), 0.005), Vb = median(base.map(h => h.V));
+  const Fth = Math.max(4 * sF, o.fminStep), out = {up, dn, step, Fb, sF, Vb, Fth, nb, warns: []};
+  let i1 = -1; for (let i = nb; i + 1 < up.length; i++) if (up[i].F - Fb > Fth && up[i + 1].F - Fb > Fth) {i1 = i; break}
+  let i2 = -1; for (let i = nb; i < up.length; i++) if (up[i].V - Vb > o.vth) {i2 = i; break}
+  if (i1 >= 0) {out.h1 = (up[i1 - 1].z + up[i1].z) / 2; out.i1 = i1}
+  if (i2 >= 0) {out.h2 = (up[i2 - 1].z + up[i2].z) / 2; out.i2 = i2; out.Fon = up[i2].F - Fb; out.Fbefore = up[i2 - 1].F - Fb}
+  if (i1 >= 0 && i1 <= nb + 1) out.warns.push('la fuerza ya cambiaba en los primeros escalones: empieza más arriba (m −4 y z)');
+  if (i2 >= 0 && i2 <= nb + 1) out.warns.push('el FSR ya respondía en los primeros escalones: empieza más arriba');
+  if (i1 < 0) out.warns.push(`las celdas no vieron fuerza sobre ${fmt(Fth, 3)} N antes de terminar`);
+  return out;
+}
+function drawSteps(sa) {
+  const box = $('#stepBox'); box.hidden = !sa; if (!sa) return;
+  const all = sa.up.concat(sa.dn), zlo = Math.min(...all.map(h => h.z)), zhi = Math.max(...all.map(h => h.z));
+  const Fmx = Math.max(0.2, ...all.map(h => h.F - sa.Fb)), Vmx = Math.max(sa.Fth, ...all.map(h => h.V - sa.Vb), 1), sc = Fmx / Vmx;
+  // zoom: de 1 mm antes de h₁ (o del inicio) hasta 0,5 mm después de h₂
+  const a = sa.h1 != null ? Math.max(zlo, Math.min(sa.h1, sa.h2 != null ? sa.h2 : sa.h1) - 1) : zlo, b = sa.h2 != null ? Math.min(zhi, Math.max(sa.h2, sa.h1 != null ? sa.h1 : sa.h2) + 0.5) : zhi;
+  const inW = h => h.z >= a - 1e-9 && h.z <= b + 1e-9, U = sa.up.filter(inW), Dn = sa.dn.filter(inW);
+  const Fz = Math.max(0.1, ...U.map(h => h.F - sa.Fb)), Vz = Math.max(1, ...U.map(h => h.V - sa.Vb)), sz = Fz / Vz;
+  plot($('#cAS'), {xLo: a, xHi: b, yLo: Math.min(0, ...U.map(h => h.F - sa.Fb)) - 0.05 * Fz, yHi: Fz * 1.12, xLabel: 'z del punzón (mm)', yLabel: 'N',
+    refs: [{y: sa.Fth, color: CSSV['--ink-3'], label: `umbral celdas ${fmt(sa.Fth, 3)} N`}],
+    vrefs: (sa.h1 != null ? [{x: sa.h1, color: CSSV['--violet'], label: 'h₁ celdas'}] : []).concat(sa.h2 != null ? [{x: sa.h2, color: CSSV['--accent'], label: 'h₂ FSR', dy: 14}] : []),
+    series: [{points: true, xs: U.map(h => h.z), ys: U.map(h => h.F - sa.Fb), color: CSSV['--ink'], r: 2.6}, {xs: U.map(h => h.z), ys: U.map(h => h.F - sa.Fb), color: CSSV['--ink'], lw: 1},
+      {points: true, xs: U.map(h => h.z), ys: U.map(h => (h.V - sa.Vb) * sz), color: CSSV['--accent'], r: 2.6}, {xs: U.map(h => h.z), ys: U.map(h => (h.V - sa.Vb) * sz), color: CSSV['--accent'], lw: 1},
+      {points: true, xs: Dn.map(h => h.z), ys: Dn.map(h => h.F - sa.Fb), color: CSSV['--teal'], r: 2}]});
+  legend($('#lgAS'), [[CSSV['--ink'], 'F asentada, bajando (N)'], [CSSV['--teal'], 'F asentada, subiendo'], [CSSV['--accent'], `V FSR − base (escala: ${fmt(Vz, 0)} mV arriba)`]]);
+  const lead = DH.status && +DH.status[13] ? +DH.status[13] : P.lead, dh = sa.h1 != null && sa.h2 != null ? sa.h2 - sa.h1 : null;
+  $('#stepNote').innerHTML = `<b>Escalones de ${fmt(sa.step, 3)} mm</b> (${sa.up.length} al bajar). En cada uno se promedia la fuerza y el FSR después de 0,45 s quieto, así el retraso del HX711 no importa. Base (primeros ${sa.nb} escalones, en el aire): F = ${fmt(sa.Fb, 3)} N, variación entre escalones ± ${fmt(sa.sF, 3)} N; FSR ${fmt(sa.Vb, 0)} mV. ` +
+    `<b>h₁</b> = primer escalón con F más de ${fmt(sa.Fth, 3)} N sobre la base (y el siguiente también): ${sa.h1 != null ? fmt(sa.h1, 3) + ' mm' : '—'}. <b>h₂</b> = primer escalón con el FSR ${fmt(ca_o_vth(), 0)} mV sobre su base: ${sa.h2 != null ? fmt(sa.h2, 3) + ' mm' : '—'}. ` +
+    (dh != null ? `<b>Δh = ${fmt(dh, 3)} ± ${fmt(sa.step, 3)} mm</b> (${fmt(dh / lead, 2)} vueltas). Fuerza en el escalón donde responde el FSR: ${fmt(sa.Fon, 3)} N (en el anterior ${fmt(sa.Fbefore, 3)} N).` : '') +
+    (sa.warns.length ? ` <span style="color:var(--warn)">${sa.warns.join(' · ')}</span>` : '');
+}
+const ca_o_vth = () => Math.max(1, +$('#aVth').value || 50);
 function median(a) {const q = a.filter(Number.isFinite).sort((x, y) => x - y), n = q.length; return n ? (n % 2 ? q[(n - 1) / 2] : (q[n / 2 - 1] + q[n / 2]) / 2) : NaN}
 const robustSd = a => {const m = median(a); return 1.4826 * median(a.map(v => Math.abs(v - m)))};
 function contactCycle(rows, sg, o) {
@@ -1508,7 +1562,7 @@ const rmOf = () => (DH.meta && DH.meta.rm) || 10000;
 function drawContact(ca) {
   const tb = $('#contactTbl'), note = $('#contactNote');
   if (!ca.cyc.length) {tb.innerHTML = '<tr><td colspan="12" class="muted">No encontré tramos de bajada que empiecen antes del contacto. Usa el ensayo «Contacto y rigidez» después de «Buscar contacto (h)».</td></tr>';
-    note.textContent = ''; $('#thrSens').innerHTML = ''; $('#aCyc').innerHTML = ''; ['cAC', 'cAK'].forEach(id => {const c = canvasCtx($('#' + id)); if (c) {c.g.fillStyle = CSSV['--ink-2']; c.g.font = '13px Barlow,sans-serif'; c.g.textAlign = 'center'; c.g.fillText('Sin tramos de contacto', c.w / 2, c.h / 2)}}); return}
+    note.textContent = ''; $('#thrSens').innerHTML = ''; $('#aCyc').innerHTML = ''; $('#lgAC').innerHTML = ''; $('#lgAK').innerHTML = ''; ['cAC', 'cAK'].forEach(id => {const c = canvasCtx($('#' + id)); if (c) {c.g.fillStyle = CSSV['--ink-2']; c.g.font = '13px Barlow,sans-serif'; c.g.textAlign = 'center'; c.g.fillText('Sin tramos de contacto', c.w / 2, c.h / 2)}}); return}
   const lead = DH.status && +DH.status[13] ? +DH.status[13] : P.lead, D = c => c.h2 != null ? c.h2 - c.h1 : null;
   tb.innerHTML = ca.cyc.map(c => `<tr${c.use ? '' : ' style="opacity:.55"'}><td><input type="checkbox" data-cyc="${c.cy}" ${c.use ? 'checked' : ''} aria-label="Usar el ciclo ${c.cy}"></td><td class="m">${c.cy}</td><td class="m">${fmt(c.h1, 3)}</td><td class="m">${c.h2 != null ? fmt(c.h2, 3) : '—'}</td><td class="m"><b>${D(c) != null ? fmt(D(c), 3) : '—'}</b></td><td class="m">${D(c) != null ? fmt(D(c) / lead, 2) : '—'}</td><td class="m">${c.h2 != null ? fmt(c.t2 - c.t1, 2) : '—'}</td><td class="m">${c.Von != null ? fmt(c.Von, 0) : '—'}</td><td class="m">${c.Fon != null ? fmt(c.Fon, 3) : '—'}</td><td class="m">${c.hz ? fmt(c.hz.E * 1000, 0) : '—'}</td><td class="m">${c.Wd != null ? fmt(c.Wd, 2) : '—'}</td><td class="small" style="min-width:260px">${c.flags.length ? '<span style="color:var(--danger)">' + c.flags.join(' · ') + '</span>' : '<span style="color:var(--ok)">ok</span>'}${c.warns.length ? '<br><span style="color:var(--warn)">' + c.warns.join(' · ') + '</span>' : ''}</td></tr>`).join('');
   $('#aCyc').innerHTML = ca.cyc.map(c => `<option value="${c.cy}">${c.cy}${c.use ? '' : ' (no usado)'}</option>`).join('');
@@ -1570,6 +1624,7 @@ function analyze() {
   const Fmax = Math.max(...rows.map(r => r.F)), hy = hysteresis(rows), rp = repeatability(rows), dr = drift(rows);
   const sens = ln ? ln.k : NaN;
   AN = {name: d.name, pw, ln, Fmax, hy, rp, dr, n: rows.length, dur: rows[rows.length - 1].t - rows[0].t, ca};
+  const sa0 = stepAnalysis(d.rows, {vth: ca.o.vth, fminStep: Math.max(0.01, +$('#aFth').value || 0.01)});
   const U = ca.used, dz = U.filter(c => c.h2 != null).map(c => c.h2 - c.h1), fo = U.filter(c => c.Fon != null).map(c => c.Fon), Ee = U.filter(c => c.hz).map(c => c.hz.E * 1000), Wd = U.filter(c => c.Wd != null).map(c => c.Wd), Wl = U.filter(c => c.Wl != null).map(c => c.Wl);
   const dzMed = median(dz), foMed = median(fo), resMed = median(U.map(c => c.res)), nPre = ca.cyc.filter(c => c.h2 != null && c.h2 < c.h1).length;
   const [dzm, dzs] = meanSd(dz), [fom, fos] = meanSd(fo), [Em, Esd] = meanSd(Ee), [Wdm] = meanSd(Wd), [Wlm] = meanSd(Wl);
@@ -1582,6 +1637,7 @@ function analyze() {
     ['Repetibilidad', Number.isFinite(rp) ? fmt(rp, 2) + ' %' : '—', 'desviación entre ciclos (carga)'],
     ['Deriva en la pausa', Number.isFinite(dr) ? fmt(dr, 2) + ' %/min' : '—', 'cambio de V con carga sostenida'],
     ['Fuerza máxima', fmt(Fmax, 2) + ' N', `${rows.length} muestras · ${fmt(AN.dur, 1)} s`],
+    sa0 && sa0.h1 != null && sa0.h2 != null ? ['Retardo del FSR Δh (escalones)', fmt(sa0.h2 - sa0.h1, 3) + ' mm', `± ${fmt(sa0.step, 3)} mm (un escalón) · ${fmt((sa0.h2 - sa0.h1) / (DH.status && +DH.status[13] ? +DH.status[13] : P.lead), 2)} vueltas · F al responder ${fmt(sa0.Fon, 3)} N`] :
     ['Retardo del FSR Δh', Number.isFinite(dzMed) ? fmt(dzMed, 3) + ' mm' : '—', Number.isFinite(dzMed) ? `mediana de ${dz.length} de ${ca.cyc.length} ciclos · media ${fmt(dzm, 3)} ± ${fmt(dzs, 3)} · ${fmt(dzMed / (DH.status && +DH.status[13] ? +DH.status[13] : P.lead), 2)} vueltas · resolución ≈ ${fmt(resMed, 3)} mm` + (nPre ? ` · en ${nPre} ciclos el FSR respondió primero` : '') : (ca.cyc.length ? `ningún ciclo válido de ${ca.cyc.length}: revisa la columna «Revisión»` : 'usa el ensayo Contacto y rigidez')],
     ['Fuerza mínima que detecta', Number.isFinite(foMed) ? fmt(foMed, 3) + ' N' : '—', Number.isFinite(foMed) ? `mediana · media ${fmt(fom, 3)} ± ${fmt(fos, 3)} N · ≈ ${fmt(foMed / G * 1000, 0)} g` : ''],
     ['Módulo E (Hertz)', Number.isFinite(Em) ? fmt(Em, 0) + ' kPa' : '—', Number.isFinite(Em) ? `± ${fmt(Esd, 0)} kPa · rigidez a 1 mm ≈ ${fmt(k1m, 2)} N/mm` : 'necesita tramos de carga desde antes del contacto'],
@@ -1618,13 +1674,14 @@ function analyze() {
     plot($('#cAD'), {xLo: z0, xHi: z1, yLo: 0, yHi: Math.max(Fmax * 1.1, 0.5), xLabel: 'z (mm)', yLabel: 'N', series: [{points: true, xs: zs, ys: rows.map(r => r.F), colors: rows.map(r => PHCOL(r.ph)), r: 1.4}]});
     legend($('#lgAD'), [[CSSV['--accent'], 'cargando'], [CSSV['--teal'], 'descargando'], [CSSV['--ink-3'], 'sin contacto detectado: eje en z del firmware']]);
   }
-  drawContact(ca);
+  AN.sa = sa0;
+  drawContact(ca); drawSteps(sa0);
   $('#aNotes').innerHTML = `<p><b>Cómo leerlo.</b> La curva de potencia R = A·F^−n es la forma típica de un FSR. La conductancia 1/R suele ser casi lineal con la fuerza en el rango útil: su pendiente es la sensibilidad. La histéresis compara la misma fuerza al cargar y al descargar. En la gráfica de fuerza contra indentación, el área entre carga y descarga es la energía que disipa la silicona. <b>Retardo del FSR:</b> h₁ es donde las celdas notan el primer toque y h₂ donde el voltaje del FSR sube sobre su ruido; Δh = h₂ − h₁ es la indentación que necesita la cúpula para que el sensor responda, y la fuerza en h₂ es la fuerza mínima que detecta. <b>Rigidez:</b> E sale de ajustar F = (4/3)·E/(1 − ν²)·√R·d^1,5 a la carga; sin corregir la flexibilidad del montaje (C), la silicona parece más blanda.</p>`;
 }
 ['aY', 'aFmin', 'aCol'].forEach(id => $('#' + id).addEventListener('change', analyze));
 /* ---------- imágenes PNG con fondo blanco u oscuro ---------- */
 const PNGS = {cA: ['curva-fsr', () => $('#aTitle').textContent, 'lgA'], cAT: ['fuerza-fsr-tiempo', 'Fuerza y FSR en el tiempo', 'lgAT'], cAD: ['fuerza-indentacion', 'Fuerza contra indentación (rigidez)', 'lgAD'],
-  cAC: ['contacto-h1-h2', 'Contacto: fuerza y FSR contra z', 'lgAC'], cAK: ['rigidez-tangente', 'Rigidez tangente', 'lgAK']};
+  cAC: ['contacto-h1-h2', 'Contacto: fuerza y FSR contra z', 'lgAC'], cAK: ['rigidez-tangente', 'Rigidez tangente', 'lgAK'], cAS: ['escalones-h1-h2', 'Escalones: fuerza y FSR con el motor quieto', 'lgAS']};
 let PNGBG = store.get('fsrPngBg', 'light');
 $$('#pngBg button').forEach(b => {b.setAttribute('aria-pressed', b.dataset.bg === PNGBG); b.onclick = () => {PNGBG = b.dataset.bg; store.set('fsrPngBg', PNGBG); $$('#pngBg button').forEach(x => x.setAttribute('aria-pressed', x === b))}});
 function composePng(id, s) {
