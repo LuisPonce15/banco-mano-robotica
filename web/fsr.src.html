@@ -1786,6 +1786,8 @@ function analyze() {
   }
   AN.sa = sa0;
   drawContact(ca); drawSteps(sa0);
+  if (!sa0 && ca.cyc.length) {const v = median(ca.cyc.map(c => c.v)), lagmm = v * Math.max(0, +$('#aLag').value || 0) / 1000;
+    $('#contactNote').insertAdjacentHTML('afterbegin', `<span style="display:block;margin-bottom:6px;padding:6px 8px;border-left:3px solid var(--warn);background:var(--warn-bg);color:var(--ink)"><b>Este archivo es de ciclos continuos</b> (${ca.cyc.length} bajadas a ${fmt(v, 2)} mm/s), no de la medición guiada por escalones. Sirve para la curva del sensor y la repetibilidad, pero Δh y la fuerza al responder dependen del retraso del HX711 (aquí ≈ ${fmt(lagmm, 2)} mm). Para Δh usa <b>Ensayo → Contacto y rigidez → 2 · Cúpula</b>: ese ensayo baja una sola vez de a 0,05 mm, quieto 1 s en cada escalón.</span>`)}
   $('#aNotes').innerHTML = `<p><b>Cómo leerlo.</b> La curva de potencia R = A·F^−n es la forma típica de un FSR. La conductancia 1/R suele ser casi lineal con la fuerza en el rango útil: su pendiente es la sensibilidad. La histéresis compara la misma fuerza al cargar y al descargar. En la gráfica de fuerza contra indentación, el área entre carga y descarga es la energía que disipa la silicona. <b>Retardo del FSR:</b> h₁ es donde las celdas notan el primer toque y h₂ donde el voltaje del FSR sube sobre su ruido; Δh = h₂ − h₁ es la indentación que necesita la cúpula para que el sensor responda, y la fuerza en h₂ es la fuerza mínima que detecta. <b>Rigidez:</b> E sale de ajustar F = (4/3)·E/(1 − ν²)·√R·d^1,5 a la carga; sin corregir la flexibilidad del montaje (C), la silicona parece más blanda.</p>`;
 }
 ['aY', 'aFmin', 'aCol'].forEach(id => $('#' + id).addEventListener('change', analyze));
