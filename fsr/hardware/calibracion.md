@@ -22,13 +22,23 @@ Lo que se busca es la relación entre la fuerza real (celdas) y la lectura del F
 - Espera 1 minuto sin carga.
 - Anota la temperatura ambiente: el FSR y la silicona cambian con ella.
 
+### Límite del FSR
+
+El firmware deja de bajar cuando el FSR llega a `vl` (2500 mV por defecto) y empieza a descargar. Vale para los ciclos (`r`), los escalones (`p`) y los movimientos a mano (`m`). Así se puede pedir una profundidad o un número de escalones de sobra: el ensayo se detiene solo en el voltaje que se quiere.
+
+### Fuerza mínima de detección
+
+1. Contacto con `h` (las celdas detectan el toque y ese punto es z = 0).
+2. Escalones finos hasta el límite del FSR: `p 0.05 99 3 0.2` (0,05 mm por escalón, pausa de 3 s, hasta 2500 mV).
+3. En el análisis, la fuerza mínima es la de las celdas en el primer escalón donde el voltaje del FSR supera la línea base más el umbral de ruido (lo que reporta `fsr_lectura`).
+
 ### Ensayos sugeridos
 
 | Ensayo | Comando | Para qué |
 |---|---|---|
 | Ciclos lentos | `r 3 0.2 5 5` | Curva principal y repetibilidad |
 | Ciclos a varias velocidades | `r 3 0.1 2 3`, `r 3 0.5 2 3`, `r 3 2 2 3` | Efecto de la velocidad (viscoelasticidad) |
-| Escalones | `p 0.5 6 20 0.5` | Puntos estáticos, deriva en cada escalón e histéresis |
+| Escalones hasta el límite del FSR | `p 0.05 99 3 0.2` | Puntos estáticos, deriva en cada escalón e histéresis |
 | Sostenido | `p 3 1 300 0.5` | Deriva (creep) del FSR con la fuerza constante de la silicona |
 
 Ajusta la profundidad para quedarte por debajo del límite de fuerza (`f 40` por defecto). Usa el banco virtual para estimar qué profundidad da la fuerza que buscas.

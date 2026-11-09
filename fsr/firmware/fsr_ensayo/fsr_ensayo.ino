@@ -24,6 +24,7 @@
 //    r 3 0.5 2 3        ciclos: profundidad 3 mm, a 0,5 mm/s, pausa 2 s, 3 ciclos
 //    p 0.5 6 5 0.5      escalones: 0,5 mm por escalón, 6 escalones, 5 s cada uno, a 0,5 mm/s
 //    f 40               límite de fuerza (N). Si se supera, se detiene y sube
+//    vl 2500            límite del FSR (mV). Al llegar, deja de bajar y empieza a descargar
 //    o 50               datos por segundo (0 = sin datos)
 //    rm 10000           resistencia fija del divisor del FSR (ohmios)
 //    modo suma / modo punzon   cómo se combinan las celdas
@@ -112,12 +113,15 @@ float fLimit  = 40.0f;         // N
 float rmOhm   = 10000.0f;
 int   streamHz = 50;
 float lastMv  = 0;
+float vLimit  = 2500.0f;     // mV: el FSR no pasa de aquí
+int   limCyc  = -1;          // ciclo en el que ya se alcanzó el límite del FSR
+bool  lastSkipped = false;
 
 enum Mode { IDLE, MANUAL, SEEK, TEST };
 Mode mode = IDLE;
 
 struct Seg { bool hold; float z, v, secs; uint8_t phase; uint16_t cycle; };
-const int MAXSEG = 160;
+const int MAXSEG = 400;
 Seg prog[MAXSEG];
 int nSeg = 0, iSeg = -1;
 bool segStarted = false;
@@ -201,7 +205,7 @@ bool canTest() {
 }
 
 void startProgram(const char* name) {
-  iSeg = 0; segStarted = false; mode = TEST;
+  iSeg = 0; segStarted = false; mode = TEST; limCyc = -1; lastSkipped = false;
   say(String("INICIO ") + name + " (" + nSeg + " tramos)");
 }
 
@@ -221,7 +225,7 @@ void cmdCycles(float depth, float v, float pause, int cycles) {
 void cmdSteps(float step, int n, float pause, float v) {
   if (!canTest()) return;
   if (step <= 0 || n < 1 || step * n > MAX_DEPTH_MM) { say(String("Paso × escalones debe quedar entre 0 y ") + MAX_DEPTH_MM + " mm."); return; }
-  v = constrain(v, 0.01f, 5.0f); pause = constrain(pause, 0.0f, 600.0f); n = min(n, (MAXSEG - 4) / 4);
+  v = constrain(v, 0.01f, 5.0f); pause = constrain(pause, 0.0f, 600.0f); n = min(n, (MAXSEG - 4) / 4);   // hasta 99 escalones
   nSeg = 0;
   addMove(Z_FREE_MM, 1.0f, 3, 0);
   addMove(0, v, 1, 1);
@@ -237,8 +241,23 @@ void runProgram() {
   Seg& s = prog[iSeg];
   phase = s.phase; cycleNo = s.cycle;
   if (!segStarted) {
+    // Si en este ciclo el FSR ya llegó al límite: no bajar más; saltar los escalones
+    // que faltaban y los de descarga que están por debajo de la posición actual.
+    if (s.cycle != 0 && limCyc == s.cycle) {
+      bool skip = (!s.hold && s.phase == 1) || (s.hold && lastSkipped) || (!s.hold && s.phase == 3 && s.z >= zNow() - 0.0005f);
+      if (skip) { lastSkipped = true; iSeg++; return; }
+    }
+    lastSkipped = false;
     segStarted = true; segT0 = millis();
     if (!s.hold) { setSpeed(s.v); st->moveTo(mm2st(s.z)); }
+    return;
+  }
+  if (!s.hold && s.phase == 1 && s.cycle != 0 && limCyc != s.cycle && lastMv >= vLimit) {
+    st->forceStop();
+    limCyc = s.cycle;
+    say(String("Límite del FSR: ") + String(lastMv, 0) + " mV ≥ " + String(vLimit, 0) + " mV con F = " + String(fTotal(), 3)
+        + " N en z = " + String(zNow(), 3) + " mm. Empiezo a descargar.");
+    iSeg++; segStarted = false;
     return;
   }
   bool done = s.hold ? (millis() - segT0 >= (uint32_t)(s.secs * 1000)) : !st->isRunning();
@@ -271,14 +290,14 @@ void checkForce() {
 // ---------------- Mensajes ----------------
 void printStatus() {
   const char* m = mode == IDLE ? "quieto" : mode == MANUAL ? "moviendo" : mode == SEEK ? "buscando_contacto" : "ensayo";
-  Serial.printf("S,%d,%d,%s,%.4f,%.4f,%.4f,%.1f,%.1f,%.0f,%s,%.1f,%.1f,%.3f\n",
+  Serial.printf("S,%d,%d,%s,%.4f,%.4f,%.4f,%.1f,%.1f,%.0f,%s,%.1f,%.1f,%.3f,%.0f\n",
                 enabled, homed, m, zNow(), hx1.newtons(), hx2.newtons(), lastMv, fLimit, rmOhm,
-                sumMode ? "suma" : "punzon", hx1.k, hx2.k, LEAD_MM);
+                sumMode ? "suma" : "punzon", hx1.k, hx2.k, LEAD_MM, vLimit);
   say(String("Motor ") + (enabled ? "con fuerza" : "suelto") + " · " + m + " · z = " + String(zNow(), 3) + " mm"
       + (homed ? "" : " (sin contacto definido)"));
   say(String("F1 = ") + String(hx1.newtons(), 3) + " N · F2 = " + String(hx2.newtons(), 3) + " N · F = "
       + String(fTotal(), 3) + " N (" + (sumMode ? "suma de las dos" : "solo celda 1") + ")");
-  say(String("FSR: ") + String(lastMv, 0) + " mV con Rm = " + String(rmOhm, 0) + " Ω · límite " + String(fLimit, 1) + " N");
+  say(String("FSR: ") + String(lastMv, 0) + " mV con Rm = " + String(rmOhm, 0) + " Ω · límites " + String(fLimit, 1) + " N y " + String(vLimit, 0) + " mV");
 }
 
 void help() {
@@ -295,6 +314,7 @@ void help() {
     "r 3 0.5 2 3         ciclos: prof. mm, mm/s, pausa s, ciclos",
     "p 0.5 6 5 0.5       escalones: paso mm, n, pausa s, mm/s",
     "f 40                límite de fuerza (N)",
+    "vl 2500             límite del FSR (mV)",
     "o 50                datos por segundo (0 = apagado)",
     "rm 10000            resistencia del divisor del FSR",
     "modo suma | modo punzon",
@@ -342,6 +362,7 @@ void handle(String line) {
   else if (cmd == "r") cmdCycles(a[0], na > 1 ? a[1] : 0.5f, na > 2 ? a[2] : 2.0f, na > 3 ? (int)a[3] : 3);
   else if (cmd == "p") cmdSteps(a[0], na > 1 ? (int)a[1] : 5, na > 2 ? a[2] : 5.0f, na > 3 ? a[3] : 0.5f);
   else if (cmd == "f") { fLimit = constrain(a[0], 0.5f, 0.95f * CELL_RATED_N * (sumMode ? 2 : 1)); prefs.putFloat("flim", fLimit); say(String("Límite de fuerza: ") + String(fLimit, 1) + " N"); }
+  else if (cmd == "vl") { if (a[0] > 50) { vLimit = constrain(a[0], 100.0f, 3200.0f); prefs.putFloat("vlim", vLimit); } say(String("Límite del FSR: ") + String(vLimit, 0) + " mV"); }
   else if (cmd == "o") { streamHz = constrain((int)a[0], 0, 100); say(String("Datos: ") + streamHz + " por segundo"); }
   else if (cmd == "rm") { if (a[0] > 0) { rmOhm = a[0]; prefs.putFloat("rm", rmOhm); } say(String("Rm = ") + String(rmOhm, 0) + " Ω"); }
   else if (cmd == "modo") {
@@ -369,6 +390,7 @@ void setup() {
   hx2.k   = prefs.getFloat("k2", hx2.k);
   rmOhm   = prefs.getFloat("rm", rmOhm);
   fLimit  = prefs.getFloat("flim", fLimit);
+  vLimit  = prefs.getFloat("vlim", vLimit);
   sumMode = prefs.getBool("suma", true);
 
   engine.init();
@@ -387,6 +409,18 @@ void setup() {
 void loop() {
   if (Serial.available()) handle(Serial.readStringUntil('\n'));
 
+  static uint32_t tFsr = 0;
+  if (millis() - tFsr >= 10) {
+    tFsr = millis();
+    lastMv = readFsrMv();
+    // también al mover a mano: no bajar con el FSR en el límite
+    if ((mode == MANUAL || mode == SEEK) && lastMv >= vLimit && st->isRunning() &&
+        st->getPositionAfterCommandsCompleted() > st->getCurrentPosition()) {
+      stopAll(nullptr);
+      say(String("ALTO: el FSR llegó a ") + String(lastMv, 0) + " mV (límite " + String(vLimit, 0) + " mV).");
+    }
+  }
+
   bool n1 = hx1.read(), n2 = hx2.read();
   if (n1 || n2) checkForce();
   if (hx1.seen && millis() - hx1.tLast > 1500 && !hx1.warned) { hx1.warned = true; say("La celda 1 (HX711) dejó de responder."); }
@@ -399,7 +433,6 @@ void loop() {
   static uint32_t tData = 0;
   if (streamHz > 0 && millis() - tData >= 1000u / streamHz) {
     tData = millis();
-    lastMv = readFsrMv();
     Serial.printf("D,%lu,%.4f,%.4f,%.4f,%.1f,%u,%u\n", (unsigned long)millis(), zNow(),
                   hx1.newtons(), hx2.newtons(), lastMv, phase, cycleNo);
   }

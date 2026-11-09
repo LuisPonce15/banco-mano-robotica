@@ -333,11 +333,12 @@ fieldset.pg legend{font-family:var(--mono);font-size:11px;letter-spacing:.06em;t
             <div class="pf"><label for="rN">Ciclos</label><input id="rN" type="number" value="3" step="1" min="1"></div>
           </div>
           <div class="f2" id="testP" hidden>
-            <div class="pf"><label for="pS">Paso (mm)</label><input id="pS" type="number" value="0.5" step="0.1"></div>
-            <div class="pf"><label for="pN">Escalones</label><input id="pN" type="number" value="6" step="1"></div>
-            <div class="pf"><label for="pP">Pausa por escalón (s)</label><input id="pP" type="number" value="5" step="1"></div>
-            <div class="pf"><label for="pV">Velocidad (mm/s)</label><input id="pV" type="number" value="0.5" step="0.1"></div>
+            <div class="pf"><label for="pS">Paso (mm)</label><input id="pS" type="number" value="0.05" step="0.01"></div>
+            <div class="pf"><label for="pN">Escalones (máx.)</label><input id="pN" type="number" value="99" step="1"></div>
+            <div class="pf"><label for="pP">Pausa por escalón (s)</label><input id="pP" type="number" value="3" step="1"></div>
+            <div class="pf"><label for="pV">Velocidad (mm/s)</label><input id="pV" type="number" value="0.2" step="0.1"></div>
           </div>
+          <p class="small muted">Los dos ensayos dejan de bajar cuando el FSR llega al <b>límite del FSR</b> (abajo, 2500 mV por defecto) y entonces descargan. Los escalones finos (0,05 mm con pausa) dan la curva estática y la fuerza mínima de detección.</p>
           <label class="check"><input type="checkbox" id="autoRec" checked> Grabar el ensayo automáticamente</label>
           <button class="btn pri" id="testGo">Iniciar ensayo</button>
           <span class="small muted mono" id="testCmd"></span>
@@ -346,6 +347,7 @@ fieldset.pg legend{font-family:var(--mono);font-size:11px;letter-spacing:.06em;t
           <h3>Ajustes del firmware</h3>
           <div class="f2">
             <div class="pf"><label for="fLim">Límite de fuerza (N)</label><input id="fLim" type="number" value="40" step="1"></div>
+            <div class="pf"><label for="vLim">Límite del FSR (mV)</label><input id="vLim" type="number" value="2500" step="50"></div>
             <div class="pf"><label for="rmSel">Rm del divisor</label><select id="rmSel"><option value="1000">1 kΩ</option><option value="3300">3,3 kΩ</option><option value="4700">4,7 kΩ</option><option value="10000" selected>10 kΩ</option><option value="22000">22 kΩ</option><option value="47000">47 kΩ</option></select></div>
             <div class="pf"><label for="modoSel">Celdas</label><select id="modoSel"><option value="suma">Suma (las dos bajo la plataforma)</option><option value="punzon">Punzón (celda 2 en el brazo)</option></select></div>
             <div class="pf"><label for="hzSel">Datos por segundo</label><select id="hzSel"><option>10</option><option>25</option><option selected>50</option><option>100</option></select></div>
@@ -653,7 +655,7 @@ class VirtualBench {
     this.fs = {peak: 0, prev: 0, tLoad: 0, unload: false};
     this.hx = [0, 1].map(i => ({next: 0, ready: false, raw: 0, off: Math.round((i ? -52000 : 38000)), k: 21898, offset: 0, tLast: 0}));
     this.calMass = [0, 0]; this.Rm = 10000;
-    Object.assign(this, {enabled: false, homed: false, sum: true, vManual: 1, fLimit: 40, rm: 10000, hz: 50, lastMv: 0, mode: 'IDLE', prog: [], iSeg: -1, segStarted: false, segT0: 0, phase: 0, cyc: 0, tData: 0, pending: [], booted: false});
+    Object.assign(this, {enabled: false, homed: false, sum: true, vManual: 1, fLimit: 40, vLimit: 2500, limCyc: -1, lastSkipped: false, tFsr: 0, rm: 10000, hz: 50, lastMv: 0, mode: 'IDLE', prog: [], iSeg: -1, segStarted: false, segT0: 0, phase: 0, cyc: 0, tData: 0, pending: [], booted: false});
     this.boot();
   }
   say(s) {this.out('# ' + s)}
@@ -713,14 +715,14 @@ class VirtualBench {
     this.help(); this.say('Haciendo tara inicial (deja la plataforma sin contacto)...');
     this.pending.push({at: 1.7, fn: () => {this.tare(); this.status()}});
   }
-  help() {['?  ayuda            s  estado', 'e / d               motor con fuerza / suelto', 't                   tara de las celdas (sin contacto)', 'c1 500 / c2 500     calibrar celda 1 / 2 con 500 g encima', 'v 1                 velocidad manual (mm/s)', 'm 2.5               mover 2,5 mm (+ baja, - sube)', 'z                   esta posición es z = 0', 'h                   buscar el contacto con la silicona', 'r 3 0.5 2 3         ciclos: prof. mm, mm/s, pausa s, ciclos', 'p 0.5 6 5 0.5       escalones: paso mm, n, pausa s, mm/s', 'f 40                límite de fuerza (N)', 'o 50                datos por segundo (0 = apagado)', 'rm 10000            resistencia del divisor del FSR', 'modo suma | modo punzon', 'x                   detener'].forEach(l => this.say(l))}
+  help() {['?  ayuda            s  estado', 'e / d               motor con fuerza / suelto', 't                   tara de las celdas (sin contacto)', 'c1 500 / c2 500     calibrar celda 1 / 2 con 500 g encima', 'v 1                 velocidad manual (mm/s)', 'm 2.5               mover 2,5 mm (+ baja, - sube)', 'z                   esta posición es z = 0', 'h                   buscar el contacto con la silicona', 'r 3 0.5 2 3         ciclos: prof. mm, mm/s, pausa s, ciclos', 'p 0.5 6 5 0.5       escalones: paso mm, n, pausa s, mm/s', 'f 40                límite de fuerza (N)', 'vl 2500             límite del FSR (mV)', 'o 50                datos por segundo (0 = apagado)', 'rm 10000            resistencia del divisor del FSR', 'modo suma | modo punzon', 'x                   detener'].forEach(l => this.say(l))}
   tare() {this.hx.forEach(h => h.offset = h.raw); this.say('Tara lista. Celda 1: ok · Celda 2: ok')}
   status() {
     const m = {IDLE: 'quieto', MANUAL: 'moviendo', SEEK: 'buscando_contacto', TEST: 'ensayo'}[this.mode];
-    this.out(`S,${+this.enabled},${+this.homed},${m},${this.zNow().toFixed(4)},${this.N(0).toFixed(4)},${this.N(1).toFixed(4)},${this.lastMv.toFixed(1)},${this.fLimit.toFixed(1)},${this.rm.toFixed(0)},${this.sum ? 'suma' : 'punzon'},${this.hx[0].k.toFixed(1)},${this.hx[1].k.toFixed(1)},${P.lead.toFixed(3)}`);
+    this.out(`S,${+this.enabled},${+this.homed},${m},${this.zNow().toFixed(4)},${this.N(0).toFixed(4)},${this.N(1).toFixed(4)},${this.lastMv.toFixed(1)},${this.fLimit.toFixed(1)},${this.rm.toFixed(0)},${this.sum ? 'suma' : 'punzon'},${this.hx[0].k.toFixed(1)},${this.hx[1].k.toFixed(1)},${P.lead.toFixed(3)},${this.vLimit.toFixed(0)}`);
     this.say(`Motor ${this.enabled ? 'con fuerza' : 'suelto'} · ${m} · z = ${this.zNow().toFixed(3)} mm${this.homed ? '' : ' (sin contacto definido)'}`);
     this.say(`F1 = ${this.N(0).toFixed(3)} N · F2 = ${this.N(1).toFixed(3)} N · F = ${this.fTotal().toFixed(3)} N (${this.sum ? 'suma de las dos' : 'solo celda 1'})`);
-    this.say(`FSR: ${this.lastMv.toFixed(0)} mV con Rm = ${this.rm.toFixed(0)} Ω · límite ${this.fLimit.toFixed(1)} N`);
+    this.say(`FSR: ${this.lastMv.toFixed(0)} mV con Rm = ${this.rm.toFixed(0)} Ω · límites ${this.fLimit.toFixed(1)} N y ${this.vLimit.toFixed(0)} mV`);
   }
   canTest() {
     if (!this.enabled) {this.say('Primero habilita el motor con e.'); return false}
@@ -728,7 +730,7 @@ class VirtualBench {
     if (this.mode !== 'IDLE') {this.say('Hay un movimiento en curso. Detén con x.'); return false}
     return true;
   }
-  startProgram(name) {this.iSeg = 0; this.segStarted = false; this.mode = 'TEST'; this.say(`INICIO ${name} (${this.prog.length} tramos)`)}
+  startProgram(name) {this.iSeg = 0; this.segStarted = false; this.mode = 'TEST'; this.limCyc = -1; this.lastSkipped = false; this.say(`INICIO ${name} (${this.prog.length} tramos)`)}
   cmd(line) {
     line = line.trim(); if (!line) return;
     const sp = line.indexOf(' '), c = (sp < 0 ? line : line.slice(0, sp)).toLowerCase(), rest = sp < 0 ? '' : line.slice(sp + 1);
@@ -761,6 +763,7 @@ class VirtualBench {
       case 'r': this.cycles(A(0), na > 1 ? A(1) : 0.5, na > 2 ? A(2) : 2, na > 3 ? Math.trunc(A(3)) : 3); break;
       case 'p': this.steps(A(0), na > 1 ? Math.trunc(A(1)) : 5, na > 2 ? A(2) : 5, na > 3 ? A(3) : 0.5); break;
       case 'f': this.fLimit = clamp(A(0), 0.5, 0.95 * 98.07 * (this.sum ? 2 : 1)); this.say(`Límite de fuerza: ${this.fLimit.toFixed(1)} N`); break;
+      case 'vl': if (A(0) > 50) this.vLimit = clamp(A(0), 100, 3200); this.say(`Límite del FSR: ${this.vLimit.toFixed(0)} mV`); break;
       case 'o': this.hz = clamp(Math.trunc(A(0)), 0, 100); this.say(`Datos: ${this.hz} por segundo`); break;
       case 'rm': if (A(0) > 0) {this.rm = A(0); this.Rm = A(0)} this.say(`Rm = ${this.rm.toFixed(0)} Ω`); break;
       case 'modo': {const r = rest.trim().toLowerCase(); if (r.startsWith('s')) this.sum = true; else if (r.startsWith('p')) this.sum = false;
@@ -781,7 +784,7 @@ class VirtualBench {
   cycles(depth, v, pause, n) {
     if (!this.canTest()) return;
     if (!(depth > 0 && depth <= 20)) {this.say('Profundidad entre 0 y 20 mm.'); return}
-    v = clamp(v, 0.01, 5); pause = clamp(pause, 0, 600); n = clamp(n, 1, 39);
+    v = clamp(v, 0.01, 5); pause = clamp(pause, 0, 600); n = clamp(n, 1, 99);
     const p = [{z: -0.5, v: 1, ph: 3, c: 0}];
     for (let c = 1; c <= n; c++) p.push({z: depth, v, ph: 1, c}, {hold: pause, ph: 2, c}, {z: -0.5, v, ph: 3, c}, {hold: pause, ph: 4, c});
     this.prog = p; this.startProgram('ciclos');
@@ -789,7 +792,7 @@ class VirtualBench {
   steps(step, n, pause, v) {
     if (!this.canTest()) return;
     if (!(step > 0 && n >= 1 && step * n <= 20)) {this.say('Paso × escalones debe quedar entre 0 y 20 mm.'); return}
-    v = clamp(v, 0.01, 5); pause = clamp(pause, 0, 600); n = Math.min(n, 39);
+    v = clamp(v, 0.01, 5); pause = clamp(pause, 0, 600); n = Math.min(n, 99);
     const p = [{z: -0.5, v: 1, ph: 3, c: 0}, {z: 0, v, ph: 1, c: 1}];
     for (let i = 1; i <= n; i++) p.push({z: i * step, v, ph: 1, c: 1}, {hold: pause, ph: 2, c: 1});
     for (let i = n - 1; i >= 0; i--) p.push({z: i * step, v, ph: 3, c: 1}, {hold: pause, ph: 4, c: 1});
@@ -800,7 +803,18 @@ class VirtualBench {
     if (this.mode !== 'TEST') return;
     if (this.iSeg >= this.prog.length) {this.mode = 'IDLE'; this.phase = 0; this.say('FIN del ensayo'); return}
     const s = this.prog[this.iSeg]; this.phase = s.ph; this.cyc = s.c;
-    if (!this.segStarted) {this.segStarted = true; this.segT0 = this.t; if (s.hold == null) {this.setSpeed(s.v); this.moveTo(Math.round(s.z * this.spmm()))} return}
+    if (!this.segStarted) {
+      if (s.c !== 0 && this.limCyc === s.c) {
+        const skip = (s.hold == null && s.ph === 1) || (s.hold != null && this.lastSkipped) || (s.hold == null && s.ph === 3 && s.z >= this.zNow() - 0.0005);
+        if (skip) {this.lastSkipped = true; this.iSeg++; return}
+      }
+      this.lastSkipped = false;
+      this.segStarted = true; this.segT0 = this.t; if (s.hold == null) {this.setSpeed(s.v); this.moveTo(Math.round(s.z * this.spmm()))} return}
+    if (s.hold == null && s.ph === 1 && s.c !== 0 && this.limCyc !== s.c && this.lastMv >= this.vLimit) {
+      this.forceStop(); this.limCyc = s.c;
+      this.say(`Límite del FSR: ${this.lastMv.toFixed(0)} mV ≥ ${this.vLimit.toFixed(0)} mV con F = ${this.fTotal().toFixed(3)} N en z = ${this.zNow().toFixed(3)} mm. Empiezo a descargar.`);
+      this.iSeg++; this.segStarted = false; return;
+    }
     if (s.hold != null ? this.t - this.segT0 >= s.hold : !this.running()) {this.iSeg++; this.segStarted = false}
   }
   checkForce() {
@@ -820,11 +834,14 @@ class VirtualBench {
     this.stepMotor(dt); this.physics(dt);
     for (let k = this.pending.length - 1; k >= 0; k--) if (this.t >= this.pending[k].at) {const p = this.pending.splice(k, 1)[0]; p.fn()}
     const n1 = this.hxRead(0), n2 = this.hxRead(1); if (n1 || n2) this.checkForce();
+    if (this.ms - this.tFsr >= 10) {this.tFsr = this.ms; this.lastMv = this.adcMv();
+      if ((this.mode === 'MANUAL' || this.mode === 'SEEK') && this.lastMv >= this.vLimit && this.running() && this.mot.target > this.mot.pos) {
+        this.stopAll(); this.say(`ALTO: el FSR llegó a ${this.lastMv.toFixed(0)} mV (límite ${this.vLimit.toFixed(0)} mV).`)}}
     if (this.mode === 'MANUAL' && !this.running()) this.mode = 'IDLE';
     if (this.mode === 'SEEK' && !this.running()) {this.mode = 'IDLE'; this.say('No encontré contacto en 40 mm. ¿La muestra está debajo? ¿INVERT_DIR?')}
     this.runProgram();
     if (this.hz > 0 && this.ms - this.tData >= Math.floor(1000 / this.hz)) {
-      this.tData = this.ms; this.lastMv = this.adcMv();
+      this.tData = this.ms;
       this.out(`D,${this.ms},${this.zNow().toFixed(4)},${this.N(0).toFixed(4)},${this.N(1).toFixed(4)},${this.lastMv.toFixed(1)},${this.phase},${this.cyc}`);
     }
   }
@@ -865,6 +882,7 @@ function onLine(line) {
 function syncSettingsFromStatus(p) {
   const rm = String(Math.round(+p[9])); if ([...$('#rmSel').options].some(o => o.value === rm)) $('#rmSel').value = rm;
   $('#modoSel').value = p[10] === 'suma' ? 'suma' : 'punzon'; $('#fLim').value = (+p[8]).toFixed(0);
+  if (p[14] && Number.isFinite(+p[14])) $('#vLim').value = (+p[14]).toFixed(0);
 }
 const logEl = $('#log');
 function logLine(text, cls) {
@@ -1035,7 +1053,8 @@ function drawLive() {
   plot($('#cF'), {xLo, xHi, yLo: fy0, yHi: Math.max(fy1, 0.5), xLabel: 't (s)', yLabel: 'N', refs: fy1 > lim * 0.6 ? [{y: lim, color: CSSV['--danger'], label: 'límite'}] : [],
     series: [{xs: ts, ys: f1, color: CSSV['--violet'], lw: 1.2}, {xs: ts, ys: f2, color: CSSV['--teal'], lw: 1.2}, {xs: ts, ys: F, color: CSSV['--ink'], lw: 2}]});
   legend($('#lgF'), [[CSSV['--ink'], DH.meta.suma ? 'F = F1 + F2' : 'F = F1', last ? fmt(last.F, 2) + ' N' : null], [CSSV['--violet'], 'F1', last ? fmt(last.f1, 2) : null], [CSSV['--teal'], 'F2', last ? fmt(last.f2, 2) : null]]);
-  plot($('#cV'), {xLo, xHi, yLo: 0, yHi: 3300, xLabel: 't (s)', yLabel: 'mV', refs: [{y: 3100, color: CSSV['--warn'], label: 'saturación del ADC'}], series: [{xs: ts, ys: V, color: CSSV['--accent'], lw: 1.8}]});
+  const vlim = DH.status && DH.status[14] ? +DH.status[14] : (SRC.vb ? SRC.vb.vLimit : 2500);
+  plot($('#cV'), {xLo, xHi, yLo: 0, yHi: 3300, xLabel: 't (s)', yLabel: 'mV', refs: [{y: 3100, color: CSSV['--warn'], label: 'saturación del ADC'}, {y: vlim, color: CSSV['--danger'], label: 'límite del FSR'}], series: [{xs: ts, ys: V, color: CSSV['--accent'], lw: 1.8}]});
   legend($('#lgV'), [[CSSV['--accent'], 'V del divisor', last ? fmt(last.V, 0) + ' mV' : null], [CSSV['--ink-3'], 'R FSR', last ? fmtR(last.R) : null]]);
   const [zy0, zy1] = range([Z], 0.15);
   plot($('#cZ'), {xLo, xHi, yLo: zy0, yHi: zy1, xLabel: 't (s)', yLabel: 'mm', refs: [{y: 0, color: CSSV['--ink-3'], label: 'contacto (z = 0)'}], series: [{xs: ts, ys: Z, color: CSSV['--ink'], lw: 1.8}]});
@@ -1160,6 +1179,7 @@ function updTestCmd() {$('#testCmd').textContent = 'Comando: ' + testCmd()}
 ['rD', 'rV', 'rP', 'rN', 'pS', 'pN', 'pP', 'pV'].forEach(id => $('#' + id).addEventListener('input', updTestCmd)); updTestCmd();
 $('#testGo').onclick = () => {if ($('#autoRec').checked) {SRC.autoRecNext = true; SRC.stopRecOnFin = true} send(testCmd())};
 $('#fLim').onchange = () => send('f ' + (+$('#fLim').value || 40));
+$('#vLim').onchange = () => send('vl ' + (+$('#vLim').value || 2500));
 $('#rmSel').onchange = () => send('rm ' + $('#rmSel').value);
 $('#modoSel').onchange = () => send('modo ' + $('#modoSel').value);
 $('#hzSel').onchange = () => send('o ' + $('#hzSel').value);
