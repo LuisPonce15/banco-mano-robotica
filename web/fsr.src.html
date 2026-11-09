@@ -108,6 +108,8 @@ pre{margin:0;background:var(--paper);border:1px solid var(--rule);border-radius:
 .chart .lg i{width:14px;height:3px;border-radius:2px;display:inline-block}
 .chart .pngb{position:absolute;top:8px;right:8px;padding:2px 7px;font-size:11.5px;font-family:var(--mono)}
 .chart.pad-r h3{padding-right:52px}
+.wiz{display:flex;flex-direction:column;gap:6px;border:1px solid var(--rule);border-radius:6px;padding:10px;background:var(--paper)}
+.wiz .btn{justify-content:flex-start;text-align:left}
 .thrs{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
 .thrs .btn{font-family:var(--mono);font-size:11.5px;padding:2px 6px}
 .thrs .btn[aria-pressed="true"]{background:var(--ink);color:var(--sheet)}
@@ -366,17 +368,18 @@ details.pre>summary h2{flex:1 1 auto}
               <div class="pf"><label for="ctP">Quieto en cada escalón (s)</label><input id="ctP" type="number" value="1" step="0.5"></div>
               <div class="pf"><label for="ctN">Velocidad entre escalones (mm/s)</label><input id="ctN" type="number" value="0.2" step="0.1"></div>
             </div>
-            <div class="small"><b>Recomendado: por escalones</b> (cada botón manda el comando; espera a que termine cada uno):
-              <ol style="margin:4px 0 0 18px;padding:0;display:flex;flex-direction:column;gap:3px">
-                <li>Punzón por lo menos 1 cm arriba y <button class="btn sm" data-send="t">t</button> tara.</li>
-                <li><button class="btn sm" data-send="vl 2000">vl 2000</button> límite del FSR: apenas responde bien, el motor sube. Así no se fuerza.</li>
-                <li><button class="btn sm" data-send="h">h</button> buscar el contacto (z = 0 donde las celdas pasan 0,05 N y sube 0,5 mm).</li>
-                <li><button class="btn sm" data-send="m -3">m -3</button> subir 3 mm más y <button class="btn sm" data-send="z">z</button> z = 0 ahí. Si crees que la cúpula se deforma antes de que las celdas lo vean, sube más (m −5).</li>
-                <li>Marca «Grabar automáticamente» e <b>Iniciar ensayo</b> (manda <code>p 0.05 99 1 0.2</code>): baja de a 0,05 mm, se queda quieto 1 s en cada escalón (hasta 4,95 mm o el límite del FSR) y vuelve igual. Tarda ~4 min.</li>
-              </ol>
-              Con el motor quieto, las celdas y el FSR se leen ya asentados: el retraso del HX711 no afecta y Δh sale con ± 0,05 mm. El resultado aparece en <b>Análisis → Contacto y respuesta del FSR → Escalones</b>.
-              <br><b>Comprobación con papel</b> (opcional): con el motor quieto, pon una tira de papel sobre la cúpula y baja con −0,05 hasta que el papel quede prensado; anota z. Ese es el toque real, sin depender de las celdas. Después baja hasta que el FSR suba y anota z otra vez.
-              <br>Después, para los ensayos normales, vuelve a hacer <b>h</b>.</div>
+            <div class="wiz">
+              <b>Medición guiada</b>: la página manda cada comando, espera a que el motor termine, pone límites de fuerza bajos para que el motor no se fuerce y al final actualiza los parámetros.
+              <button class="btn" id="wzRig">1 · Montaje rígido: bloque en vez de la cúpula → C</button>
+              <button class="btn pri" id="wzDome">2 · Cúpula: retardo del FSR y rigidez → Δh</button>
+              <div class="row"><button class="btn sm" id="wzStop" disabled>Detener</button><span class="small muted">Antes de cada uno: punzón por lo menos 1 cm arriba y nada tocando las celdas (hace la tara al empezar).</span></div>
+              <p class="small" id="wzState" aria-live="polite"></p>
+              <details class="small"><summary>Qué hace cada uno</summary>
+                <p><b>1 · Montaje rígido</b> (una vez, o si cambias el montaje): <code>t</code> · <code>e</code> · <code>f 10</code> (si la fuerza pasa 10 N, para y sube 1 mm) · <code>h</code> · <code>z</code> (z = 0 a 0,5 mm del bloque) · <code>p 0.01 99 1 0.1</code> (escalones de 0,01 mm, 1 s quieto). Al terminar vuelve a <code>f 40</code> y calcula <b>C</b> = cuánto se mueve z por newton con algo que no se deforma: es lo que ceden el marco, la varilla y las celdas. Queda guardado y se resta en el análisis de la cúpula.</p>
+                <p><b>2 · Cúpula</b>: <code>t</code> · <code>e</code> · <code>vl 2000</code> (apenas el FSR responde bien, deja de bajar) · <code>f 22</code> (por si el FSR no responde) · <code>h</code> · <code>m -2.5</code> · <code>z</code> (empieza 3 mm por encima del punto que encontró h) · <code>p 0.05 99 1 0.2</code> (~4 min). Al terminar vuelve a <code>f 40</code>, calcula h₁, h₂ y Δh con el motor quieto en cada escalón y lleva Δh al modelo virtual.</p>
+                <p>Los mismos ensayos se pueden hacer a mano con los campos de arriba e <b>Iniciar ensayo</b>. <b>Comprobación con papel</b>: con el motor quieto, una tira de papel sobre la cúpula; baja con −0,05 hasta que quede prensada y anota z (el toque real, sin depender de las celdas); sigue hasta que suba el FSR y anota z otra vez. Después de cualquiera de estos, para los ensayos normales vuelve a hacer <b>h</b>.</p>
+              </details>
+            </div>
           </div>
           <div class="f2" id="testP" hidden>
             <div class="pf"><label for="pS">Paso (mm)</label><input id="pS" type="number" value="0.05" step="0.01"></div>
@@ -431,7 +434,7 @@ details.pre>summary h2{flex:1 1 auto}
         <div class="pf"><label for="aCol">Colorear por</label><select id="aCol"><option value="fase">Carga / descarga</option><option value="ciclo">Ciclo</option></select></div>
         <fieldset class="pg"><legend>Contacto y rigidez</legend>
           <div class="f2">
-            <div class="pf"><label for="aR">Radio de la cúpula R (mm)</label><input id="aR" type="number" step="0.5"></div>
+            <div class="pf"><label for="aR">Radio de la cúpula R (mm, radio de la esfera)</label><input id="aR" type="number" step="0.5"></div>
             <div class="pf"><label for="aNu">Poisson ν</label><input id="aNu" type="number" value="0.49" step="0.01"></div>
             <div class="pf"><label for="aDf">Hertz hasta d (mm)</label><input id="aDf" type="number" step="0.1"></div>
             <div class="pf"><label for="aC">Flexibilidad del montaje C (mm/N)</label><input id="aC" type="number" value="0" step="0.001"></div>
@@ -648,11 +651,12 @@ const MATS = {
 };
 const DEF = {
   lead: 1.25, micro: 16, eta: 0.3, Irun: 1.0, Irated: 1.7, Thold: 0.42, armW: 0.6, backlash: 0.05, kFrame: 80, gap0: 3,
-  mat: 'ds20', E: 0.34, g1: 0.07, tau: 3, Rd: 20, hd: 18, rp: 8,
+  mat: 'ds20', E: 0.34, g1: 0.07, tau: 3, Rd: 30, hd: 18, rp: 15,
   zF: 5, dDead: 3, rAct: 6.35, R1: 10000, n: 0.9, Rsat: 200, Fon: 0.15, hyst: 0.12, creep: 0.03, conc: 1.3, var: 1.0,
   adcNoise: 6, hxRate: 10, share: 0.5, platN: 1.2, kErr1: 1.07, kErr2: 0.94
 };
 const P = Object.assign({}, DEF, store.get('fsrP', {}));
+if (!P.geoV2) {if (P.Rd === 20) P.Rd = 30; if (P.rp === 8) P.rp = 15; P.geoV2 = true}   // cúpula de R 30 mm y punzón plano de 30 mm
 const PARAMS = [
   ['Tornillo y motor', [
     ['lead', 'Avance del tornillo (mm/vuelta)', 'sel', [[1.25, 'M8 · 1,25'], [2, 'T8 · 2'], [8, 'T8 · 8']]],
@@ -668,7 +672,7 @@ const PARAMS = [
     ['tau', 'Tiempo de relajación τ (s)', 'num', 0.2, 60, 0.1],
     ['Rd', 'Radio de la cúpula (mm)', 'num', 5, 50, 0.5],
     ['hd', 'Altura de la cúpula (mm)', 'num', 3, 50, 0.5],
-    ['rp', 'Radio del punzón (mm)', 'num', 1, 30, 0.5]]],
+    ['rp', 'Radio del punzón (mm; plano de Ø30 → 15)', 'num', 1, 30, 0.5]]],
   ['FSR402', [
     ['zF', 'Profundidad del FSR bajo la superficie (mm)', 'num', 0.5, 30, 0.5],
     ['dDead', 'Retardo: indentación antes de que el FSR responda (mm)', 'num', 0, 15, 0.05],
@@ -976,6 +980,7 @@ function onLine(line) {
   if (line.startsWith('# ')) {
     const msg = line.slice(2); logLine(msg, /ALTO|Error|no responde|No encontr|SIN RESPUESTA/.test(msg) ? 'er' : '');
     if (/^INICIO /.test(msg) && $('#autoRec').checked && SRC.autoRecNext) {SRC.autoRecNext = false; startRec()}
+    if (/^FIN del ensayo|^ALTO/.test(msg)) {WZ.fin = true; if (/^ALTO/.test(msg)) WZ.alto = msg}
     if (/^FIN del ensayo/.test(msg) && DH.recOn && SRC.stopRecOnFin) {SRC.stopRecOnFin = false; stopRec(true)}
     if (/^ALTO/.test(msg) && DH.recOn && SRC.stopRecOnFin) {SRC.stopRecOnFin = false; stopRec(true)}
     if (/^Modo suma/.test(msg)) DH.meta.suma = true; if (/^Modo punzón/.test(msg)) DH.meta.suma = false;
@@ -1001,13 +1006,15 @@ function startVirtual(autoplay) {
   seed = 12345; SRC.vb = new VirtualBench(onLine); DH.s.length = 0; DH.meta = {rm: 10000, suma: true};
   if (autoplay) {
     const vb = SRC.vb;
-    vb.pending.push({at: 2.0, fn: () => send('e')}, {at: 2.3, fn: () => send('h')});
-    const wait = () => {if (!SRC.vb || SRC.vb !== vb) return; if (vb.homed && vb.mode === 'IDLE') {send('r 8 0.8 1 30')} else vb.pending.push({at: vb.t + 0.3, fn: wait})};
+    SRC.demo = true;   // demostración: se cancela apenas el usuario manda un comando
+    const dsend = c => {if (SRC.demo && SRC.vb === vb) {SRC.demoSend = true; send(c); SRC.demoSend = false}};
+    vb.pending.push({at: 2.0, fn: () => dsend('e')}, {at: 2.3, fn: () => dsend('h')});
+    const wait = () => {if (!SRC.vb || SRC.vb !== vb || !SRC.demo) return; if (vb.homed && vb.mode === 'IDLE') {dsend('r 8 0.8 1 30'); SRC.demo = false} else vb.pending.push({at: vb.t + 0.3, fn: wait})};
     vb.pending.push({at: 2.6, fn: wait});
   }
 }
 async function send(cmd) {
-  cmd = String(cmd); logLine(cmd, 'tx');
+  cmd = String(cmd); logLine(cmd, 'tx'); if (!SRC.demoSend) SRC.demo = false;
   if (SRC.kind === 'virtual') {if (SRC.vb) SRC.vb.cmd(cmd); return true}
   if (!SRC.writer) {toast('Conecta el ESP32 primero'); return false}
   try {await SRC.writer.write(new TextEncoder().encode(cmd + '\n')); return true} catch (e) {logLine('Error al escribir: ' + e.message, 'er'); return false}
@@ -1291,7 +1298,7 @@ const PRE = [
   ['Motor', 'Probar +0,05 y −0,05 a 0,05 mm/s: + baja y − sube'],
   ['Ensayo', 'Buscar contacto: z = 0 en el toque y queda 0,5 mm arriba', 'h'],
   ['Ensayo', 'Acondicionar el FSR: 5 ciclos sin grabar (el límite del FSR los corta)', 'r 1 0.5 0 5'],
-  ['Ensayo', 'Una sola vez (o si cambias el montaje): ensayo «Contacto y rigidez» con un bloque rígido en vez de la cúpula, y en Análisis «Usar como montaje rígido»'],
+  ['Ensayo', 'Una sola vez (o si cambias el montaje): bloque rígido en vez de la cúpula y, en «Contacto y rigidez», el botón «1 · Montaje rígido» (limita la fuerza a 10 N y guarda C)'],
   ['Ensayo', 'Elegir el ensayo, marcar «Grabar automáticamente» e Iniciar ensayo'],
   ['Al terminar', 'Guardar CSV y Llevar a Análisis'],
   ['Al terminar', 'Soltar el motor, quitar los 12 V y después el USB', 'd']
@@ -1330,6 +1337,56 @@ function testCmd() {const t = $('#testSeg [aria-pressed="true"]').dataset.test;
 function updTestCmd() {$('#testCmd').textContent = 'Comando: ' + testCmd()}
 ['rD', 'rV', 'rP', 'rN', 'pS', 'pN', 'pP', 'pV', 'ctD', 'ctV', 'ctP', 'ctN'].forEach(id => $('#' + id).addEventListener('input', updTestCmd)); updTestCmd();
 $('#testGo').onclick = () => {if ($('#autoRec').checked) {SRC.autoRecNext = true; SRC.stopRecOnFin = true} send(testCmd())};
+/* ---------- medición guiada ---------- */
+const WZ = {run: false, abort: false, fin: false, alto: null};
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const wzSay = (t, cls) => {$('#wzState').innerHTML = t; $('#wzState').style.color = cls === 'er' ? 'var(--danger)' : cls === 'ok' ? 'var(--ok)' : ''};
+async function wzIdle(maxS) {         // espera a que el firmware diga «quieto»
+  await sleep(600); const t0 = performance.now();
+  while (performance.now() - t0 < maxS * 1000) {
+    if (WZ.abort) throw new Error('detenido por ti');
+    if (WZ.alto) throw new Error('el firmware se detuvo: ' + WZ.alto);
+    await send('s'); await sleep(400); if (DH.status && DH.status[3] === 'quieto') return;
+  }
+  throw new Error('el motor no terminó en ' + maxS + ' s');
+}
+async function wzCmd(c, label, waitS) {wzSay(`${label} <code>${c}</code>`); if (!(await send(c))) throw new Error('no pude mandar ' + c); if (waitS) await wzIdle(waitS); else await sleep(c === 't' ? 2500 : 500)}
+async function wzTest(cmd, label, maxS) {
+  wzSay(`${label} <code>${cmd}</code> (grabando)`); WZ.fin = false; WZ.alto = null; $('#autoRec').checked = true; SRC.autoRecNext = true; SRC.stopRecOnFin = true;
+  const nDS = DS.length; await send(cmd); const t0 = performance.now();
+  while (!WZ.fin) {if (WZ.abort) {await send('x'); throw new Error('detenido por ti')} if (performance.now() - t0 > maxS * 1000) {await send('x'); throw new Error('el ensayo no terminó')}
+    await sleep(300); const s_ = Math.round((performance.now() - t0) / 1000); if (s_ % 5 === 0) wzSay(`${label} <code>${cmd}</code> · ${s_} s · z = ${DH.last ? fmt(DH.last.z, 3) : '—'} mm · F = ${DH.last ? fmt(DH.last.F, 2) : '—'} N · FSR = ${DH.last ? fmt(DH.last.V, 0) : '—'} mV`)}
+  await sleep(800); if (DH.recOn) stopRec(true);
+  if (DS.length === nDS) throw new Error('no se grabó el ensayo');
+  return DS[DS.length - 1];
+}
+async function wizard(kind) {
+  if (WZ.run) return; if (SRC.kind !== 'virtual' && !SRC.writer) {toast('Conecta el ESP32 primero'); return}
+  WZ.run = true; WZ.abort = false; WZ.alto = null; $('#wzStop').disabled = false; $('#wzRig').disabled = $('#wzDome').disabled = true;
+  try {
+    if (SRC.kind === 'virtual') {SRC.demo = false; startVirtual(false); await sleep(500)}
+    await wzCmd('x', 'Deteniendo cualquier movimiento'); await wzCmd('t', 'Tara (punzón en el aire)'); await wzCmd('e', 'Motor con fuerza');
+    if (kind === 'rig') {
+      await wzCmd('f 10', 'Límite de fuerza bajo'); await wzCmd('h', 'Buscando el bloque', 120); await wzCmd('z', 'z = 0 a 0,5 mm del bloque');
+      WZ.alto = null; const d = await wzTest('p 0.01 99 1 0.1', 'Escalones contra el bloque', 400);
+      await wzCmd('f 40', 'Límite de fuerza normal');
+      const c = complianceFrom(d); if (!c) throw new Error('no encontré escalones con más de 1 N: ¿el punzón llegó al bloque?');
+      RIG.C = c.C; RIG.from = d.name; store.set('fsrRig', RIG); $('#aC').value = +c.C.toFixed(5); updRigNote(); analyze();
+      wzSay(`Listo: <b>C = ${fmt(c.C, 4)} mm/N</b> (rigidez del montaje ${fmt(1 / c.C, 0)} N/mm, ${c.n} escalones, R² ${fmt(c.r2, 3)}). Quedó guardada en Análisis. Ahora pon la cúpula y corre el 2.`, 'ok');
+    } else {
+      await wzCmd('vl 2000', 'Límite del FSR'); await wzCmd('f 22', 'Límite de fuerza de seguridad'); await wzCmd('h', 'Buscando el contacto', 120);
+      await wzCmd('m -2.5', 'Subiendo 2,5 mm más', 30); await wzCmd('z', 'z = 0 en el aire (3 mm sobre el punto de h)');
+      WZ.alto = null; const d = await wzTest('p 0.05 99 1 0.2', 'Escalones sobre la cúpula', 700);
+      await wzCmd('f 40', 'Límite de fuerza normal');
+      curDS = DS.indexOf(d); renderDS(); analyze(); const sa = AN && AN.sa;
+      if (sa && sa.h1 != null && sa.h2 != null) {const dh = sa.h2 - sa.h1; P.dDead = +Math.max(0, dh).toFixed(3); store.set('fsrP', P); buildParams(); drawModel();
+        wzSay(`Listo: <b>Δh = ${fmt(dh, 3)} ± ${fmt(sa.step, 3)} mm</b> (${fmt(dh / P.lead, 2)} vueltas), FSR responde con ${fmt(sa.Fon, 2)} N. Se llevó al modelo virtual. Detalle en <b>Análisis → Escalones</b>.`, 'ok')}
+      else wzSay(`El ensayo terminó pero no encontré ${sa && sa.h1 == null ? 'h₁ (las celdas no vieron fuerza)' : 'h₂ (el FSR no subió en los 4,95 mm de escalones)'}: mira <b>Análisis → Escalones</b>. Si el FSR no alcanzó a responder, haz el ensayo a mano con paso 0,1 mm.`, 'er');
+    }
+  } catch (e) {wzSay('Se detuvo: ' + e.message + '. Dejo el límite de fuerza en 40 N.', 'er'); try {await send('x'); await sleep(300); await send('f 40')} catch (_) {}}
+  finally {WZ.run = false; $('#wzStop').disabled = true; $('#wzRig').disabled = $('#wzDome').disabled = false}
+}
+$('#wzRig').onclick = () => wizard('rig'); $('#wzDome').onclick = () => wizard('dome'); $('#wzStop').onclick = () => {WZ.abort = true; send('x')};
 $('#fLim').onchange = () => send('f ' + (+$('#fLim').value || 40));
 $('#vLim').onchange = () => send('vl ' + (+$('#vLim').value || 2500));
 $('#rmSel').onchange = () => send('rm ' + $('#rmSel').value);
@@ -1547,11 +1604,17 @@ function contactCycle(rows, sg, o) {
 const USE_OVR = new Map();     // ciclos que el usuario incluyó o sacó a mano
 const THR_LIST = [10, 20, 50, 100, 200, 300, 500, 1000, 1500];
 function contactAnalysis(rows) {
-  const o = {R: +$('#aR').value || P.Rd, nu: +$('#aNu').value || 0.49, dFit: +$('#aDf').value || 0.15 * (+$('#aR').value || P.Rd), C: +$('#aC').value || 0, vth: Math.max(1, +$('#aVth').value || 50), vn: Math.max(1, Math.round(+$('#aVn').value || 5)),
+  const o = {R: +$('#aR').value || 30, nu: +$('#aNu').value || 0.49, dFit: +$('#aDf').value || 0.15 * (+$('#aR').value || 30), C: +$('#aC').value || 0, vth: Math.max(1, +$('#aVth').value || 50), vn: Math.max(1, Math.round(+$('#aVn').value || 5)),
     lag: Math.max(0, +$('#aLag').value || 0), fk: 6, fmin: Math.max(0.001, +$('#aFth').value || 0.01)};
   const cyc = loadSegments(rows).map(sg => contactCycle(rows, sg, o)).filter(Boolean), key = DS[curDS] ? DS[curDS].name : '';
   cyc.forEach(c => {const k = key + '|' + c.cy; c.use = USE_OVR.has(k) ? USE_OVR.get(k) : c.auto});
   return {o, cyc, used: cyc.filter(c => c.use)};
+}
+function complianceFrom(d) {     // con escalones: z asentada contra F asentada, entre 1 N y el 90 % del máximo
+  const sa = stepAnalysis(d.rows, {vth: 1e9, fminStep: 0.01});
+  if (sa) {const Fm = Math.max(...sa.up.map(h => h.F - sa.Fb)), pts = sa.up.filter(h => h.F - sa.Fb > 1 && h.F - sa.Fb < 0.9 * Fm);
+    if (pts.length >= 3) {const f = linfit(pts.map(h => h.F - sa.Fb), pts.map(h => h.z)); return {C: f.b, r2: f.r2, n: pts.length}}}
+  return compliance(alignForce(d.rows, Math.max(0, +$('#aLag').value || 0) / 1000));
 }
 function compliance(rows) {     // montaje rígido: z = z0 + C·F en la carga, por encima de 0,5 N
   const pts = rows.filter(r => r.ph === 1 && r.F > 0.5); if (pts.length < 10) return null;
@@ -1596,17 +1659,20 @@ function drawContact(ca) {
 }
 $('#contactTbl').addEventListener('change', e => {const cy = e.target.dataset.cyc; if (cy == null) return; USE_OVR.set((DS[curDS] ? DS[curDS].name : '') + '|' + cy, e.target.checked); analyze()});
 $('#aCyc').addEventListener('change', () => {CYC_SEL = +$('#aCyc').value; analyze()});
-$('#aR').value = P.Rd; $('#aDf').value = +(0.15 * P.Rd).toFixed(2); $('#aC').value = RIG.C;
+const AGEO = Object.assign({R: 30, nu: 0.49}, store.get('fsrGeo', {})); $('#aR').value = AGEO.R; $('#aNu').value = AGEO.nu; $('#aDf').value = +(0.15 * AGEO.R).toFixed(2); $('#aC').value = RIG.C;
+['aR', 'aNu'].forEach(id => $('#' + id).addEventListener('change', () => {AGEO.R = +$('#aR').value || 30; AGEO.nu = +$('#aNu').value || 0.49; store.set('fsrGeo', AGEO); if (id === 'aR') $('#aDf').value = +(0.15 * AGEO.R).toFixed(2)}));
 const ATH = Object.assign({vth: 50, vn: 5, fth: 0.01, lag: 200}, store.get('fsrThr', {}));
 if (!ATH.lagV2) {if (ATH.lag === 250) ATH.lag = 200; ATH.lagV2 = true; store.set('fsrThr', ATH)}   // el valor medido con el banco real es ~200 ms $('#aVth').value = ATH.vth; $('#aVn').value = ATH.vn; $('#aFth').value = ATH.fth; $('#aLag').value = ATH.lag;
 ['aVth', 'aVn', 'aFth', 'aLag'].forEach(id => $('#' + id).addEventListener('change', () => {ATH.vth = +$('#aVth').value || 50; ATH.vn = Math.max(1, Math.round(+$('#aVn').value || 5)); ATH.fth = Math.max(0.001, +$('#aFth').value || 0.01); ATH.lag = Math.max(0, +$('#aLag').value || 0); store.set('fsrThr', ATH); analyze()}));
 $('#thrSens').addEventListener('click', e => {const b = e.target.closest('[data-thr]'); if (!b) return; $('#aVth').value = b.dataset.thr; $('#aVth').dispatchEvent(new Event('change'))});
 function updRigNote() {const C = +$('#aC').value || 0; $('#aRigNote').textContent = C ? `C = ${fmt(C, 4)} mm/N → rigidez del montaje ${fmt(1 / C, 0)} N/mm${RIG.from ? ' (de «' + RIG.from + '»)' : ''}.` : 'C = 0: sin corrección. Mídela una vez con un bloque rígido en lugar de la cúpula.'}
 ['aR', 'aNu', 'aDf', 'aC'].forEach(id => $('#' + id).addEventListener('change', () => {if (id === 'aC') {RIG.C = +$('#aC').value || 0; RIG.from = ''; store.set('fsrRig', RIG)} updRigNote(); analyze()}));
-$('#aRig').onclick = () => {const d = DS[curDS]; if (!d) return; const c = compliance(alignForce(d.rows, Math.max(0, +$('#aLag').value || 0) / 1000));
+$('#aRig').onclick = () => {const d = DS[curDS]; if (!d) return; const c = complianceFrom(d);
   if (!c || !(c.C > 0)) {toast('No pude medir la flexibilidad: necesito un tramo de carga con más de 0,5 N'); return}
   RIG.C = c.C; RIG.from = d.name; store.set('fsrRig', RIG); $('#aC').value = +c.C.toFixed(5); updRigNote(); toast(`Montaje: C = ${fmt(c.C, 4)} mm/N (R² ${fmt(c.r2, 3)})`); analyze()};
-$('#aDead').onclick = () => {if (!AN || !AN.ca) return; const dz = AN.ca.used.filter(c => c.h2 != null).map(c => c.h2 - c.h1); if (!dz.length) {toast('No hay ciclos usados con el instante en que responde el FSR'); return}
+$('#aDead').onclick = () => {if (!AN || !AN.ca) return;
+  if (AN.sa && AN.sa.h1 != null && AN.sa.h2 != null) {P.dDead = +Math.max(0, AN.sa.h2 - AN.sa.h1).toFixed(3); store.set('fsrP', P); buildParams(); drawModel(); toast(`Retardo del modelo virtual: ${fmt(P.dDead, 3)} mm (escalones)`); return}
+  const dz = AN.ca.used.filter(c => c.h2 != null).map(c => c.h2 - c.h1); if (!dz.length) {toast('No hay ciclos usados con el instante en que responde el FSR'); return}
   const m = Math.max(0, median(dz)); P.dDead = +m.toFixed(3); store.set('fsrP', P); buildParams(); drawModel(); toast(`Retardo del modelo virtual: ${fmt(m, 3)} mm`)};
 updRigNote();
 let AN = null;
