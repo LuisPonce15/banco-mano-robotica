@@ -23,6 +23,7 @@ jobs:
               - firmware/banco_prueba
               - firmware/banco_fase1
               - fsr/firmware/fsr_ensayo
+              - fsr/firmware/fsr_lectura
           # El paquete 2.x solo se prueba con banco_prueba: banco_fase1 y
           # fsr_ensayo usan librerías actuales que piden el 3.x.
           - core: "2.0.17"
@@ -32,6 +33,7 @@ jobs:
                 version: 2.0.17
             sketches: |
               - firmware/banco_prueba
+              - fsr/firmware/fsr_lectura
     steps:
       - uses: actions/checkout@v5
 

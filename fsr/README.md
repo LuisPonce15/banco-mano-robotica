@@ -46,6 +46,14 @@ Cada GPIO del shield tiene una fila **G · V · S** (tierra, 3,3 V con el puente
 
 Detalles en [`hardware/conexiones.md`](hardware/conexiones.md), [`hardware/montaje.md`](hardware/montaje.md) y [`hardware/calibracion.md`](hardware/calibracion.md).
 
+## Primera prueba: solo el FSR
+
+`firmware/fsr_lectura/fsr_lectura.ino` lee solo el divisor del FSR, sin librerías. Al arrancar mide 2 s sin tocar el sensor y calcula el **umbral de detección** (el voltaje mínimo que se distingue del ruido).
+
+- **Serial Plotter** (115200): gráfica en vivo de V, el umbral y cuándo detecta.
+- Escribe `t` en el Monitor Serie para ver V, R_FSR y conductancia en texto, o `w` para verlo en la pestaña **Ensayo** de la página.
+- `b` repite la línea base; `r 47000` si cambias Rm.
+
 ## Primera prueba: solo el motor
 
 Se puede probar el motor antes de conectar los HX711 y el FSR: sus fuerzas quedan en 0 y el firmware avisa «SIN RESPUESTA» en la tara, lo cual es normal.
