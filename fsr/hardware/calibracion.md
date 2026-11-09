@@ -9,7 +9,7 @@
 5. Conectar el USB del ESP32.
 6. Conectar la fuente de 12 V (siempre después del USB).
 7. Página → Ensayo → ESP32 por USB → Conectar.
-8. `s`: revisar «límites 40 N y 2500 mV», Rm 10 kΩ y modo suma.
+8. `s`: revisar «límites 40 N y 2000 mV», Rm 10 kΩ y modo suma (`vl 2000` si dice 2500: con 2500 este FSR no llega al límite y el motor empuja de más).
 9. Esperar ~5 min para que las celdas se estabilicen.
 10. Sin carga: FSR en su base (~140 mV) y fuerza cerca de 0 N.
 11. `t` (tara sin contacto).
@@ -62,7 +62,7 @@ El firmware deja de bajar cuando el FSR llega a `vl` (2500 mV por defecto) y emp
 ### Fuerza mínima de detección
 
 1. Contacto con `h` (las celdas detectan el toque y ese punto es z = 0).
-2. Escalones finos hasta el límite del FSR: `p 0.05 99 3 0.2` (0,05 mm por escalón, pausa de 3 s, hasta 2500 mV).
+2. Escalones finos hasta el límite del FSR: `p 0.05 99 3 0.2` (0,05 mm por escalón, pausa de 3 s, hasta `vl`).
 3. En el análisis, la fuerza mínima es la de las celdas en el primer escalón donde el voltaje del FSR supera la línea base más el umbral de ruido (lo que reporta `fsr_lectura`).
 
 ### Retardo del FSR y rigidez de la silicona
@@ -72,6 +72,8 @@ Con un solo ensayo se miden las dos cosas. La idea: las celdas notan el primer t
 - **Base:** los primeros 0,25 mm de cada bajada, con el punzón en el aire. Se usa la mediana y una desviación robusta, y solo las lecturas nuevas del HX711 (el firmware manda 50 líneas/s pero las celdas cambian 10 veces/s). Si la fuerza o el voltaje cambian dentro de la base, el ciclo se marca: el punzón ya tocaba o el FSR no estaba en reposo.
 - **h₁ (contacto):** la primera lectura nueva de las celdas que pasa la base + máx(6 σ, umbral mínimo), confirmada por las dos siguientes. Cada fuerza se ubica donde estaba el punzón **250 ms antes**, porque el filtro del HX711 a 10 muestras/s tarda ~400 ms en asentarse. Se afina con la forma de Hertz (F^(2/3) crece lineal con z).
 - **h₂ (el FSR responde):** donde el voltaje del FSR sube **ΔV** por encima de su base durante N líneas seguidas. Se busca desde el final de la base, **no desde h₁**: si el FSR responde antes que las celdas, Δh sale negativo y se avisa. ΔV, N, el umbral mínimo de las celdas y el retraso se eligen en Análisis; la fila «Δh según el umbral» muestra Δh para ΔV de 10 a 1500 mV.
+- **Revisión mecánica:** `z` es la cuenta de pasos del motor, no una medición. Si la fuerza deja de subir mientras z sigue bajando, o si al subir la fuerza se suelta mucho más abajo de donde apareció al bajar, el punzón no se movió lo que dice z (algo cede, un tope o pasos perdidos); la página lo marca y no usa esa parte para la rigidez.
+- **Piso del ADC:** el ESP32 no lee por debajo de ~150 mV (marca ~142 mV). El FSR sin carga está por debajo de eso; «responde» cuando su resistencia baja de ~200 kΩ con Rm = 10 kΩ.
 - **Ciclos usados:** cada ciclo tiene una columna «Revisión». Los que tienen problemas no entran en el promedio (se pueden marcar a mano), y el resultado es la mediana.
 - **Resolución:** Δh no puede medirse mejor que la distancia que baja el punzón entre dos lecturas de las celdas (velocidad / 10 por segundo): 0,05 mm a 0,5 mm/s, 0,005 mm a 0,05 mm/s.
 - **Retardo:** Δh = h₂ − h₁ en mm, en vueltas de la varilla (Δh / 1,25 mm), en tiempo (Δt) y la fuerza de las celdas en h₂ (la fuerza mínima que detecta el FSR en este montaje).
@@ -80,10 +82,13 @@ Con un solo ensayo se miden las dos cosas. La idea: las celdas notan el primer t
 Pasos:
 
 1. **Una sola vez, flexibilidad del montaje (C):** pon un bloque rígido (aluminio, acero) en lugar de la cúpula, `h`, y el ensayo **Contacto y rigidez** con 1 mm de profundidad y límite de fuerza bajo (`f 20`). En Análisis, **Usar este ensayo como montaje rígido**: C = pendiente de z contra F. Queda guardado para los siguientes análisis. Sin esto, la silicona parece más blanda de lo que es.
-2. Monta la cúpula, `t` (tara) y `h` (contacto).
-3. Ensayo **Contacto y rigidez**: `r 8 0.05 2 3` (baja a 0,05 mm/s desde 0,5 mm por encima del contacto, hasta 8 mm o hasta el límite del FSR, 3 ciclos). Lento para tener muchas muestras: a 10 SPS de las celdas, 0,05 mm/s da una lectura cada 0,005 mm.
-4. En **Análisis**: pon el radio R de la cúpula y ν (0,49 para silicona). La tarjeta **Contacto y respuesta del FSR** muestra h₁, h₂, Δh, vueltas, Δt, F al responder y E por ciclo; los indicadores de arriba dan la media ± desviación.
-5. **Llevar el retardo al modelo virtual** copia la media de Δh al parámetro «Retardo» del modelo (pestaña Modelo). En el modelo, hasta esa indentación el FSR no recibe fuerza y después recibe solo la que se suma desde ahí.
+2. Monta la cúpula y haz `t` (tara) sin contacto.
+3. `vl 2000`: el motor empieza a subir apenas el FSR responde bien. Con `vl 2500` este FSR no llega al límite (su voltaje se aplana cerca de 2450 mV) y el motor sigue empujando: ahí aparece el ruido fuerte y el movimiento perdido.
+4. `h` (contacto), `m -2` (sube 2 mm más) y `z` (z = 0 ahí), esperando a que termine cada uno. Así la bajada empieza con el punzón en el aire y el contacto queda cerca de z = 2 mm. Si en Análisis la columna «Revisión» dice «fuerza en la base», el punzón todavía tocaba: usa `m -3` o `m -4`.
+5. Ensayo **Contacto y rigidez**: `r 3 0.1 2 3` (hasta 1 mm más allá del contacto, a 0,1 mm/s, 3 ciclos; el límite del FSR lo corta antes). A 0,1 mm/s el retraso del HX711 (~250 ms) equivale a 0,025 mm; a 0,5 mm/s son 0,125 mm y Δh queda indeterminado.
+6. Para los ensayos normales, vuelve a hacer `h`.
+7. En **Análisis**: pon el radio R de la cúpula y ν (0,49 para silicona). La tarjeta **Contacto y respuesta del FSR** muestra h₁, h₂, Δh, vueltas, Δt, F al responder y E por ciclo; los indicadores de arriba dan la media ± desviación.
+8. **Llevar el retardo al modelo virtual** copia la media de Δh al parámetro «Retardo» del modelo (pestaña Modelo). En el modelo, hasta esa indentación el FSR no recibe fuerza y después recibe solo la que se suma desde ahí.
 
 La resolución en z es de 1,25 mm / 3200 micropasos = 0,0004 mm; lo que limita es la frecuencia de las celdas y la velocidad, por eso el ensayo es lento.
 
