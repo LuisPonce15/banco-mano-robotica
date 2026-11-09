@@ -415,6 +415,8 @@ details.pre>summary h2{flex:1 1 auto}
         <p class="small muted">Las grabaciones de la pestaña Ensayo aparecen aquí. También puedes abrir un CSV guardado antes o hecho con <code>registrar_serial.py</code>.</p>
         <div class="pf"><label for="aY">Eje vertical</label><select id="aY"><option value="V">Voltaje del FSR (mV)</option><option value="R">Resistencia del FSR (Ω, log)</option><option value="G">Conductancia 1/R (µS)</option></select></div>
         <div class="pf"><label for="aFmin">Fuerza mínima para el ajuste (N)</label><input id="aFmin" type="number" value="0.2" step="0.1"></div>
+        <div class="pf"><label for="aLag">Retraso de las celdas HX711 (ms)</label><input id="aLag" type="number" value="250" step="25" min="0"></div>
+        <p class="small muted">El HX711 a 10 muestras/s entrega cada fuerza ~250 ms tarde (su filtro asienta en 400 ms); el FSR llega casi al instante. La página adelanta la fuerza ese tiempo para que cada fuerza quede con su voltaje y su posición. 0 = sin corregir.</p>
         <div class="pf"><label for="aCol">Colorear por</label><select id="aCol"><option value="fase">Carga / descarga</option><option value="ciclo">Ciclo</option></select></div>
         <fieldset class="pg"><legend>Contacto y rigidez</legend>
           <div class="f2">
@@ -424,6 +426,7 @@ details.pre>summary h2{flex:1 1 auto}
             <div class="pf"><label for="aC">Flexibilidad del montaje C (mm/N)</label><input id="aC" type="number" value="0" step="0.001"></div>
             <div class="pf"><label for="aVth">Umbral del FSR ΔV (mV sobre la base)</label><input id="aVth" type="number" value="50" step="5" min="1"></div>
             <div class="pf"><label for="aVn">Muestras seguidas sobre el umbral</label><input id="aVn" type="number" value="5" step="1" min="1"></div>
+            <div class="pf"><label for="aFth">Umbral mínimo de las celdas (N)</label><input id="aFth" type="number" value="0.01" step="0.005" min="0.001"></div>
           </div>
           <p class="small muted" id="aVthNote">h₂ es donde el voltaje del FSR sube ΔV por encima de su voltaje en reposo (antes del contacto) y se mantiene así.</p>
           <button class="btn sm" id="aRig">Usar este ensayo como montaje rígido</button>
@@ -444,13 +447,13 @@ details.pre>summary h2{flex:1 1 auto}
           <div class="chart pad-r"><button class="btn pngb dl" data-png="cAD" title="Guardar esta gráfica como PNG">PNG</button><h3>Fuerza contra indentación (rigidez)</h3><div class="lg" id="lgAD"></div><canvas id="cAD" aria-label="Fuerza contra indentación con ajuste de Hertz"></canvas></div>
         </div>
         <div class="card" id="cContact">
-          <div class="card-head"><h2>Contacto y respuesta del FSR</h2><span class="small muted">h₁: primer toque en las celdas · h₂: el FSR responde</span></div>
+          <div class="card-head"><h2>Contacto y respuesta del FSR</h2><span class="small muted">h₁: primer toque en las celdas · h₂: el FSR responde</span><label class="small" style="margin-left:auto">Ciclo en las gráficas <select id="aCyc"></select></label></div>
           <div class="charts">
             <div class="chart pad-r"><button class="btn pngb dl" data-png="cAC" title="Guardar esta gráfica como PNG">PNG</button><h3>Contacto: fuerza y FSR contra z</h3><div class="lg" id="lgAC"></div><canvas id="cAC" aria-label="Fuerza y voltaje del FSR contra la posición del punzón alrededor del contacto"></canvas></div>
             <div class="chart pad-r"><button class="btn pngb dl" data-png="cAK" title="Guardar esta gráfica como PNG">PNG</button><h3>Rigidez tangente</h3><div class="lg" id="lgAK"></div><canvas id="cAK" aria-label="Rigidez tangente contra indentación"></canvas></div>
           </div>
-          <div class="tbl"><table><thead><tr><th>Ciclo</th><th>h₁ contacto (mm)</th><th>h₂ FSR (mm)</th><th>Δh (mm)</th><th>Vueltas</th><th>Δt (s)</th><th>V en h₂ (mV)</th><th>F al responder (N)</th><th>E Hertz (kPa)</th><th>Energía disipada (mJ)</th></tr></thead><tbody id="contactTbl"></tbody></table></div>
-          <div class="small"><b>Δh según el umbral del FSR</b> (media de los ciclos; toca uno para usarlo):<div class="thrs" id="thrSens"></div></div>
+          <div class="tbl"><table><thead><tr><th>Usar</th><th>Ciclo</th><th>h₁ contacto (mm)</th><th>h₂ FSR (mm)</th><th>Δh (mm)</th><th>Vueltas</th><th>Δt (s)</th><th>V en h₂ (mV)</th><th>F al responder (N)</th><th>E Hertz (kPa)</th><th>Energía disipada (mJ)</th><th>Revisión</th></tr></thead><tbody id="contactTbl"></tbody></table></div>
+          <div class="small"><b>Δh según el umbral del FSR</b> (mediana de los ciclos usados; toca uno para usarlo):<div class="thrs" id="thrSens"></div></div>
           <p class="small muted" id="contactNote"></p>
         </div>
         <div class="card small muted" id="aNotes"></div>
@@ -718,6 +721,7 @@ const gauss = () => {let u = 0, v = 0; while (!u) u = rnd(); v = rnd(); return M
 class VirtualBench {
   constructor(out) {this.out = out; this.reset()}
   reset() {
+    this.hq = null;
     this.t = 0; this.ms = 0;
     this.mot = {pos: 0, v: 0, target: 0, vmax: 1, acc: 5, run: false};
     this.zOff = -P.gap0; this.d = 0; this.zm = -P.gap0; this.Fs = 0; this.Rfsr = 5e6; this.F = 0; this.Fe = 0; this.q = 0; this.FePrev = 0; this.lost = 0;
@@ -770,7 +774,11 @@ class VirtualBench {
     const F1 = this.sum ? (F + plat) * (1 - P.share) + cal[0] : F + plat + cal[0];
     const F2 = this.sum ? (F + plat) * P.share + cal[1] : F + cal[1];
     const sig = P.hxRate >= 80 ? 62 : 35, kk = [P.kErr1, P.kErr2];
-    [F1, F2].forEach((Fi, i) => {const h = this.hx[i]; if (this.t >= h.next) {h.next = this.t + 1 / P.hxRate; h.raw = Math.round(h.off + 21898 * kk[i] * Fi + sig * gauss()); h.ready = true}});
+    // filtro interno del HX711: cada dato es el promedio de los últimos 4 periodos (asienta en 400 ms a 10/s → ~200 ms de retraso)
+    const q = this.hq || (this.hq = {a: [], s1: 0, s2: 0}), win = 4 / P.hxRate; q.a.push([this.t, F1, F2]); q.s1 += F1; q.s2 += F2;
+    while (q.a.length > 1 && this.t - q.a[0][0] > win) {const o = q.a.shift(); q.s1 -= o[1]; q.s2 -= o[2]}
+    const Fm = [q.s1 / q.a.length, q.s2 / q.a.length];
+    [0, 1].forEach(i => {const h = this.hx[i]; if (this.t >= h.next) {h.next = this.t + 1 / P.hxRate; h.raw = Math.round(h.off + 21898 * kk[i] * Fm[i] + sig * gauss()); h.ready = true}});
   }
   adcMv() {const V = 3300 * this.Rm / (this.Rm + this.Rfsr); return clamp(V + P.adcNoise / Math.sqrt(8) * gauss(), 0, 3130)}
   /* ---- firmware emulado ---- */
@@ -1097,7 +1105,7 @@ function plot(cv, o) {
   if (o.yLabel) {g.save(); g.fillStyle = CSSV['--ink-2']; g.translate(11, T + ph / 2); g.rotate(-Math.PI / 2); g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(o.yLabel, 0, 0); g.restore()}
   // referencias horizontales
   (o.vrefs || []).forEach(r => {const x = X(r.x); if (x < L || x > L + pw) return; g.save(); g.setLineDash([5, 4]); g.strokeStyle = r.color; g.beginPath(); g.moveTo(x, T); g.lineTo(x, T + ph); g.stroke(); g.restore();
-    g.fillStyle = r.color; const rt = r.right || x + g.measureText(r.label).width + 6 > L + pw; g.textAlign = rt ? 'right' : 'left'; g.textBaseline = 'top'; g.fillText(r.label, x + (rt ? -4 : 4), T + 4 + (r.dy || 0))});
+    g.fillStyle = r.color; const tw = g.measureText(r.label).width + 6, rt = r.right ? x - tw >= L : x + tw > L + pw; g.textAlign = rt ? 'right' : 'left'; g.textBaseline = 'top'; g.fillText(r.label, x + (rt ? -4 : 4), T + 4 + (r.dy || 0))});
   (o.refs || []).forEach(r => {const y = Y(r.y); if (y < T || y > T + ph) return; g.save(); g.setLineDash([5, 4]); g.strokeStyle = r.color; g.beginPath(); g.moveTo(L, y); g.lineTo(L + pw, y); g.stroke(); g.restore();
     g.fillStyle = r.color; g.textAlign = 'left'; g.textBaseline = 'bottom'; g.fillText(r.label, L + 4, y - 2)});
   g.save(); g.beginPath(); g.rect(L, T, pw, ph); g.clip();
@@ -1371,27 +1379,61 @@ function loadSegments(rows) {     // tramos contiguos de bajada (fase 1), con un
   if (cur) segs.push(cur);
   return segs.filter(s => s.i1 - s.i0 > 20 && rows[s.i1].z - rows[s.i0].z > 0.1);
 }
+function alignForce(rows, lagS) {   // la fuerza que llega en t + lag es la que había en t (se mantiene escalonada)
+  if (!(lagS > 0) || rows.length < 2) return rows;
+  const out = []; let j = 0;
+  for (let i = 0; i < rows.length; i++) {const t = rows[i].t + lagS; if (t > rows[rows.length - 1].t) break; while (j < rows.length - 1 && rows[j + 1].t <= t) j++;
+    const s = rows[j]; out.push(Object.assign({}, rows[i], {f1: s.f1, f2: s.f2, F: s.F}))}
+  return out;
+}
+function median(a) {const q = a.filter(Number.isFinite).sort((x, y) => x - y), n = q.length; return n ? (n % 2 ? q[(n - 1) / 2] : (q[n / 2 - 1] + q[n / 2]) / 2) : NaN}
+const robustSd = a => {const m = median(a); return 1.4826 * median(a.map(v => Math.abs(v - m)))};
 function contactCycle(rows, sg, o) {
-  const R_ = rows.slice(sg.i0, sg.i1 + 1), z0s = R_[0].z, span = R_[R_.length - 1].z - z0s;
-  const base = R_.filter(r => r.z <= z0s + Math.min(0.25, 0.4 * span)); if (base.length < 8) return null;
-  const [Fb, Fs] = meanSd(base.map(r => r.F)), [Vb, Vs] = meanSd(base.map(r => r.V));
-  const Fth = Fb + Math.max(6 * Fs, 0.01), Vth = Vb + o.vth;
-  const sustained = (i, key, th, n) => {for (let k = i; k < Math.min(R_.length, i + n); k++) if (R_[k][key] <= th) return false; return i + n <= R_.length};
-  let ic = -1; for (let i = base.length; i < R_.length; i++) if (R_[i].F > Fth && sustained(i, 'F', Fth, 8)) {ic = i; break}
+  const R_ = rows.slice(sg.i0, sg.i1 + 1), n = R_.length, z0s = R_[0].z, span = R_[n - 1].z - z0s, flags = [];
+  // 1) Muestras nuevas del HX711: el firmware manda 50 líneas/s pero las celdas cambian solo 10 veces/s;
+  //    las líneas repetidas no son mediciones nuevas.
+  const fresh = []; for (let i = 0; i < n; i++) if (i === 0 || R_[i].F !== R_[i - 1].F) fresh.push(i);
+  // 2) Retraso de las celdas: el valor que llega en t corresponde a la fuerza de t − lag.
+  //    zF(i) = posición del punzón cuando ocurrió esa fuerza.
+  //    (la fuerza ya viene adelantada por el retraso del HX711: ver alignForce)
+  const lag = o.lag / 1000, zF = R_.map(r => r.z);
+  // 3) Base: el primer tramo de la bajada, con el punzón en el aire. Mediana y desviación robusta.
+  const bw = Math.min(0.25, 0.4 * span), nb = R_.findIndex(r => r.z > z0s + bw), nBase = nb < 0 ? n : nb;
+  const baseF = fresh.filter(i => i < nBase).map(i => R_[i].F), baseV = R_.slice(0, nBase).map(r => r.V);
+  if (baseF.length < 3 || baseV.length < 8) return null;
+  const Fb = median(baseF), Fs = Math.max(robustSd(baseF), 0.001), Vb = median(baseV), Vs = Math.max(robustSd(baseV), 0.5);
+  // ¿la base está quieta? si la fuerza o el voltaje cambian a lo largo de la base, el punzón ya tocaba o el FSR venía bajando
+  const fB = linfit(fresh.filter(i => i < nBase).map(i => R_[i].z), baseF), dFb = Math.abs(fB.b * bw);
+  if (baseF.length >= 3 && dFb > Math.max(4 * Fs, 0.02)) flags.push('la fuerza cambia en la base: el punzón ya tocaba al empezar');
+  const vB = linfit(R_.slice(0, nBase).map(r => r.z), baseV), dVb = vB.b * bw;
+  if (Math.abs(dVb) > Math.max(4 * Vs, 0.3 * o.vth)) flags.push(`el FSR ${dVb < 0 ? 'todavía bajaba' : 'subía'} en la base (${fmt(dVb, 0)} mV): no estaba en reposo`);
+  if (Math.abs(Fb) > 0.05) flags.push(`fuerza en la base ${fmt(Fb, 3)} N: revisa la tara o si quedó apoyado`);
+  // 4) h₁: primera muestra nueva de las celdas sobre la base + máx(k·σ, mínimo), confirmada por las 2 siguientes
+  const Fth = Fb + Math.max(o.fk * Fs, o.fmin), fi = fresh.filter(i => i >= nBase);
+  let ic = -1; for (let k = 0; k + 2 < fi.length; k++) if (R_[fi[k]].F > Fth && R_[fi[k + 1]].F > Fth && R_[fi[k + 2]].F > Fth) {ic = fi[k]; break}
   if (ic < 0) return null;
-  // contacto extrapolado: en Hertz F^(2/3) crece lineal con z → se ajusta justo después del umbral
-  const win = R_.slice(ic, R_.length).filter(r => r.F - Fb > 0 && r.F - Fb < Math.max(10 * (Fth - Fb), 0.3) && r.z < R_[ic].z + 0.6);
-  let h1 = R_[ic].z, h1x = NaN;
-  if (win.length > 6) {const f = linfit(win.map(r => r.z), win.map(r => Math.pow(r.F - Fb, 2 / 3))); if (f.b > 0) {h1x = -f.a / f.b; if (h1x < h1 && h1x > h1 - 0.5) h1 = h1x}}
-  const onset = th => {for (let i = ic; i < R_.length; i++) if (R_[i].V > th && sustained(i, 'V', th, o.vn)) return i; return -1};
-  let iv = onset(Vth);
-  // instante del contacto: la primera muestra con z ≥ h1
-  let it1 = ic; for (let i = 0; i <= ic; i++) if (R_[i].z >= h1) {it1 = i; break}
-  const out = {cy: sg.cy, h1, h1th: R_[ic].z, t1: R_[it1].t, Fb, Fs, Vb, Vs, Fth, Vth, seg: R_,
+  // se afina con Hertz: F^(2/3) crece lineal con z al empezar el contacto
+  const win = fi.filter(i => i >= ic && R_[i].F - Fb > 0 && R_[i].F - Fb < Math.max(10 * (Fth - Fb), 0.3) && zF[i] < zF[ic] + 0.6);
+  let h1 = zF[ic], h1x = NaN;
+  if (win.length > 4) {const f = linfit(win.map(i => zF[i]), win.map(i => Math.pow(R_[i].F - Fb, 2 / 3))); if (f.b > 0) {h1x = -f.a / f.b; if (h1x < h1 && h1x > h1 - 0.5) h1 = h1x}}
+  if (!(h1 > z0s + bw)) flags.push('el contacto cae dentro de la base: sube más el punto de partida o haz h de nuevo');
+  // 5) h₂: el FSR sube ΔV sobre su base. Se busca desde el final de la base, NO desde h₁:
+  //    si el FSR responde antes que las celdas, Δh sale negativo y se avisa.
+  const onset = th => {for (let i = nBase; i + o.vn <= n; i++) {let ok = true; for (let k = i; k < i + o.vn; k++) if (R_[k].V <= th) {ok = false; break} if (ok) return i} return -1};
+  const Vth = Vb + o.vth, iv = onset(Vth);
+  let it1 = 0; while (it1 < n - 1 && R_[it1].z < h1) it1++;
+  const v = span / Math.max(1e-6, R_[n - 1].t - R_[0].t);
+  const out = {cy: sg.cy, h1, h1th: zF[ic], t1: R_[it1].t, Fb, Fs, Vb, Vs, Fth, Vth, seg: R_, zF, fresh, nBase, flags, v,
+    res: v * (median(fresh.slice(1).map((i, k) => R_[i].t - R_[fresh[k]].t)) || 0.1), lagmm: v * lag,
     sens: THR_LIST.map(d => {const k = onset(Vb + d); return k >= 0 ? R_[k].z - h1 : null})};
-  if (iv >= 0) Object.assign(out, {h2: R_[iv].z, t2: R_[iv].t, Fon: R_[iv].F - Fb, Von: R_[iv].V});
+  if (iv >= 0) {
+    Object.assign(out, {h2: R_[iv].z, t2: R_[iv].t, Von: R_[iv].V});
+    out.Fon = R_[iv].F - Fb;
+    if (out.h2 < h1) flags.push('el FSR respondió antes que las celdas: baja la velocidad o sube ΔV');
+    else if (out.h2 - h1 < 2 * out.res) flags.push(`Δh menor que la resolución (≈ ${fmt(out.res, 3)} mm a esta velocidad)`);
+  } else flags.push('el FSR no pasó el umbral en esta bajada');
   // indentación corregida y Hertz: F = A·d^1,5
-  const pts = R_.filter(r => r.z > h1).map(r => {const F = r.F - Fb; return {d: r.z - h1 - o.C * F, F}}).filter(p => p.d > 0);
+  const pts = fresh.filter(i => zF[i] > h1).map(i => {const F = R_[i].F - Fb; return {d: zF[i] - h1 - o.C * F, F}}).filter(p => p.d > 0);
   const fit = pts.filter(p => p.d <= o.dFit);
   if (fit.length > 8) {
     let sxy = 0, sxx = 0; fit.forEach(p => {const x = Math.pow(p.d, 1.5); sxy += x * p.F; sxx += x * x}); const A = sxy / sxx;
@@ -1399,66 +1441,79 @@ function contactCycle(rows, sg, o) {
     const Es = 3 * A / (4 * Math.sqrt(o.R)); out.hz = {A, Es, E: Es * (1 - o.nu * o.nu), r2: 1 - ss / st};
   }
   out.pts = pts;
-  // energía: área bajo la carga menos área bajo la descarga del mismo ciclo (mm·N = mJ)
   const unl = rows.filter(r => r.cy === sg.cy && r.ph === 3 && r.z > h1).map(r => {const F = r.F - Fb; return {d: r.z - h1 - o.C * F, F}}).sort((a, b) => a.d - b.d);
   const area = P_ => {const q = P_.slice().sort((a, b) => a.d - b.d); let A = 0; for (let i = 1; i < q.length; i++) A += (q[i].d - q[i - 1].d) * (q[i].F + q[i - 1].F) / 2; return A};
   if (unl.length > 5 && pts.length > 5) {const Wl = area(pts), Wu = area(unl); out.Wl = Wl; out.Wd = Wl - Wu}
+  out.auto = !flags.some(f => !f.startsWith('Δh menor'));
   return out;
 }
+const USE_OVR = new Map();     // ciclos que el usuario incluyó o sacó a mano
 const THR_LIST = [10, 20, 50, 100, 200, 300, 500, 1000, 1500];
 function contactAnalysis(rows) {
-  const o = {R: +$('#aR').value || P.Rd, nu: +$('#aNu').value || 0.49, dFit: +$('#aDf').value || 0.15 * (+$('#aR').value || P.Rd), C: +$('#aC').value || 0, vth: Math.max(1, +$('#aVth').value || 50), vn: Math.max(1, Math.round(+$('#aVn').value || 5))};
-  const cyc = loadSegments(rows).map(sg => contactCycle(rows, sg, o)).filter(Boolean);
-  return {o, cyc};
+  const o = {R: +$('#aR').value || P.Rd, nu: +$('#aNu').value || 0.49, dFit: +$('#aDf').value || 0.15 * (+$('#aR').value || P.Rd), C: +$('#aC').value || 0, vth: Math.max(1, +$('#aVth').value || 50), vn: Math.max(1, Math.round(+$('#aVn').value || 5)),
+    lag: Math.max(0, +$('#aLag').value || 0), fk: 6, fmin: Math.max(0.001, +$('#aFth').value || 0.01)};
+  const cyc = loadSegments(rows).map(sg => contactCycle(rows, sg, o)).filter(Boolean), key = DS[curDS] ? DS[curDS].name : '';
+  cyc.forEach(c => {const k = key + '|' + c.cy; c.use = USE_OVR.has(k) ? USE_OVR.get(k) : c.auto});
+  return {o, cyc, used: cyc.filter(c => c.use)};
 }
 function compliance(rows) {     // montaje rígido: z = z0 + C·F en la carga, por encima de 0,5 N
   const pts = rows.filter(r => r.ph === 1 && r.F > 0.5); if (pts.length < 10) return null;
   const f = linfit(pts.map(r => r.F), pts.map(r => r.z)); return {C: f.b, r2: f.r2, n: pts.length};
 }
+let CYC_SEL = null;
 function drawContact(ca) {
   const tb = $('#contactTbl'), note = $('#contactNote');
-  if (!ca.cyc.length) {tb.innerHTML = '<tr><td colspan="10" class="muted">No encontré tramos de bajada que empiecen antes del contacto. Usa el ensayo «Contacto y rigidez» después de «Buscar contacto (h)».</td></tr>';
-    note.textContent = ''; ['cAC', 'cAK'].forEach(id => {const c = canvasCtx($('#' + id)); if (c) {c.g.fillStyle = CSSV['--ink-2']; c.g.font = '13px Barlow,sans-serif'; c.g.textAlign = 'center'; c.g.fillText('Sin tramos de contacto', c.w / 2, c.h / 2)}}); return}
-  const lead = DH.status && +DH.status[13] ? +DH.status[13] : P.lead;
-  tb.innerHTML = ca.cyc.map(c => `<tr><td class="m">${c.cy}</td><td class="m">${fmt(c.h1, 3)}</td><td class="m">${c.h2 != null ? fmt(c.h2, 3) : '—'}</td><td class="m"><b>${c.h2 != null ? fmt(c.h2 - c.h1, 3) : '—'}</b></td><td class="m">${c.h2 != null ? fmt((c.h2 - c.h1) / lead, 2) : '—'}</td><td class="m">${c.h2 != null ? fmt(c.t2 - c.t1, 2) : '—'}</td><td class="m">${c.Von != null ? fmt(c.Von, 0) : '—'}</td><td class="m">${c.Fon != null ? fmt(c.Fon, 3) : '—'}</td><td class="m">${c.hz ? fmt(c.hz.E * 1000, 0) : '—'}</td><td class="m">${c.Wd != null ? fmt(c.Wd, 2) : '—'}</td></tr>`).join('');
-  const c = ca.cyc[0], R_ = c.seg, hi = (c.h2 != null ? c.h2 : c.h1) + 0.6, lo = c.h1 - 0.4;
-  const W = R_.filter(r => r.z >= lo && r.z <= hi), Fmx = Math.max(0.05, ...W.map(r => r.F - c.Fb)), sc = Fmx / 3300;
-  plot($('#cAC'), {xLo: lo, xHi: hi, yLo: Math.min(0, ...W.map(r => r.F - c.Fb)), yHi: Fmx * 1.1, xLabel: 'z del punzón (mm)', yLabel: 'N',
-    refs: [{y: (c.Vth - c.Vb) * sc, color: CSSV['--accent'], label: `umbral FSR ${fmt(c.Vth - c.Vb, 0)} mV`}],
-    vrefs: [{x: c.h1, color: CSSV['--violet'], label: 'h₁ contacto'}].concat(c.h2 != null ? [{x: c.h2, color: CSSV['--accent'], label: 'h₂ FSR', dy: 14}] : []),
-    series: [{xs: W.map(r => r.z), ys: W.map(r => r.F - c.Fb), color: CSSV['--ink'], lw: 1.8}, {xs: W.map(r => r.z), ys: W.map(r => (r.V - c.Vb) * sc), color: CSSV['--accent'], lw: 1.4}]});
-  legend($('#lgAC'), [[CSSV['--ink'], 'F − base (N)'], [CSSV['--accent'], 'V FSR − base (escalado)'], [CSSV['--violet'], `ciclo ${c.cy}: Δh = ${c.h2 != null ? fmt(c.h2 - c.h1, 3) + ' mm' : '—'}`]]);
-  // rigidez tangente dF/dd (ajuste local)
+  if (!ca.cyc.length) {tb.innerHTML = '<tr><td colspan="12" class="muted">No encontré tramos de bajada que empiecen antes del contacto. Usa el ensayo «Contacto y rigidez» después de «Buscar contacto (h)».</td></tr>';
+    note.textContent = ''; $('#thrSens').innerHTML = ''; $('#aCyc').innerHTML = ''; ['cAC', 'cAK'].forEach(id => {const c = canvasCtx($('#' + id)); if (c) {c.g.fillStyle = CSSV['--ink-2']; c.g.font = '13px Barlow,sans-serif'; c.g.textAlign = 'center'; c.g.fillText('Sin tramos de contacto', c.w / 2, c.h / 2)}}); return}
+  const lead = DH.status && +DH.status[13] ? +DH.status[13] : P.lead, D = c => c.h2 != null ? c.h2 - c.h1 : null;
+  tb.innerHTML = ca.cyc.map(c => `<tr${c.use ? '' : ' style="opacity:.55"'}><td><input type="checkbox" data-cyc="${c.cy}" ${c.use ? 'checked' : ''} aria-label="Usar el ciclo ${c.cy}"></td><td class="m">${c.cy}</td><td class="m">${fmt(c.h1, 3)}</td><td class="m">${c.h2 != null ? fmt(c.h2, 3) : '—'}</td><td class="m"><b>${D(c) != null ? fmt(D(c), 3) : '—'}</b></td><td class="m">${D(c) != null ? fmt(D(c) / lead, 2) : '—'}</td><td class="m">${c.h2 != null ? fmt(c.t2 - c.t1, 2) : '—'}</td><td class="m">${c.Von != null ? fmt(c.Von, 0) : '—'}</td><td class="m">${c.Fon != null ? fmt(c.Fon, 3) : '—'}</td><td class="m">${c.hz ? fmt(c.hz.E * 1000, 0) : '—'}</td><td class="m">${c.Wd != null ? fmt(c.Wd, 2) : '—'}</td><td class="small" style="min-width:220px">${c.flags.length ? c.flags.join(' · ') : '<span style="color:var(--ok)">ok</span>'}</td></tr>`).join('');
+  $('#aCyc').innerHTML = ca.cyc.map(c => `<option value="${c.cy}">${c.cy}${c.use ? '' : ' (no usado)'}</option>`).join('');
+  const c = ca.cyc.find(q => q.cy === CYC_SEL) || ca.used[0] || ca.cyc[0]; $('#aCyc').value = c.cy;
+  const R_ = c.seg, hi = Math.max(c.h1, c.h2 != null ? c.h2 : c.h1) + 0.6, lo = Math.min(c.h1, c.h2 != null ? c.h2 : c.h1, R_[0].z + 0.1) - 0.2;
+  const W = R_.filter(r => r.z >= lo && r.z <= hi), Fi = c.fresh.filter(i => R_[i].z >= lo && R_[i].z <= hi);
+  const Fmx = Math.max(0.05, ...Fi.map(i => R_[i].F - c.Fb)), Vmx = Math.max(c.Vth - c.Vb, ...W.map(r => r.V - c.Vb)) || 1, sc = Fmx / Vmx;
+  plot($('#cAC'), {xLo: lo, xHi: hi, yLo: Math.min(0, ...Fi.map(i => R_[i].F - c.Fb), ...W.map(r => (r.V - c.Vb) * sc)), yHi: Fmx * 1.1, xLabel: 'z del punzón (mm)', yLabel: 'N',
+    refs: [{y: (c.Vth - c.Vb) * sc, color: CSSV['--accent'], label: `umbral FSR ΔV = ${fmt(c.Vth - c.Vb, 0)} mV`}],
+    vrefs: [{x: R_[c.nBase - 1].z, color: CSSV['--ink-3'], label: 'fin de la base', right: true, dy: 28}, {x: c.h1, color: CSSV['--violet'], label: 'h₁ contacto'}].concat(c.h2 != null ? [{x: c.h2, color: CSSV['--accent'], label: 'h₂ FSR', dy: 14}] : []),
+    series: [{xs: Fi.map(i => c.zF[i]), ys: Fi.map(i => R_[i].F - c.Fb), color: CSSV['--ink'], lw: 1.8}, {xs: W.map(r => r.z), ys: W.map(r => (r.V - c.Vb) * sc), color: CSSV['--accent'], lw: 1.4}]});
+  legend($('#lgAC'), [[CSSV['--ink'], 'F − base (N)'], [CSSV['--accent'], `V FSR − base (escala: ${fmt(Vmx, 0)} mV arriba)`], [CSSV['--violet'], `ciclo ${c.cy}: Δh = ${D(c) != null ? fmt(D(c), 3) + ' mm' : '—'}`]]);
   const pts = c.pts.slice().sort((a, b) => a.d - b.d), kd = [], kv = [];
   const wnd = Math.max(0.05, (pts.length ? pts[pts.length - 1].d : 1) / 25);
   for (let i = 0; i < pts.length; i += Math.max(1, Math.floor(pts.length / 80))) {const q = pts.filter(p => Math.abs(p.d - pts[i].d) <= wnd); if (q.length > 4) {const f = linfit(q.map(p => p.d), q.map(p => p.F)); kd.push(pts[i].d); kv.push(f.b)}}
   const hzK = kd.map(d => c.hz ? 1.5 * c.hz.A * Math.sqrt(d) : NaN);
   plot($('#cAK'), {xLo: 0, xHi: Math.max(0.5, ...kd), yLo: 0, yHi: Math.max(1, ...kv.filter(Number.isFinite)) * 1.15, xLabel: 'indentación d (mm)', yLabel: 'N/mm',
-    vrefs: c.h2 != null ? [{x: c.h2 - c.h1, color: CSSV['--accent'], label: 'FSR responde'}] : [], series: [{xs: kd, ys: kv, color: CSSV['--ink'], lw: 1.8}, {xs: kd, ys: hzK, color: CSSV['--teal'], lw: 1.4, dash: [6, 4]}]});
+    vrefs: D(c) > 0 ? [{x: D(c), color: CSSV['--accent'], label: 'FSR responde'}] : [], series: [{xs: kd, ys: kv, color: CSSV['--ink'], lw: 1.8}, {xs: kd, ys: hzK, color: CSSV['--teal'], lw: 1.4, dash: [6, 4]}]});
   legend($('#lgAK'), [[CSSV['--ink'], 'rigidez tangente dF/dd'], [CSSV['--teal'], 'Hertz']]);
-  const vth = ca.o.vth, sel = THR_LIST.map((d, j) => {const v = ca.cyc.map(q => q.sens[j]).filter(x => x != null); return {d, v: v.length ? meanSd(v)[0] : null}});
+  const U = ca.used.length ? ca.used : ca.cyc, vth = ca.o.vth, sel = THR_LIST.map((d, j) => {const v = U.map(q => q.sens[j]).filter(x => x != null); return {d, v: v.length ? median(v) : null}});
   $('#thrSens').innerHTML = sel.map(q => `<button class="btn" data-thr="${q.d}" aria-pressed="${q.d === vth}">${q.d} mV → ${q.v != null ? fmt(q.v, 3) + ' mm' : '—'}</button>`).join('');
-  const noise6 = 6 * Math.max(...ca.cyc.map(q => q.Vs));
-  $('#aVthNote').innerHTML = `h₂ es donde el voltaje del FSR sube ΔV por encima de su voltaje en reposo (antes del contacto, ${fmt(c.Vb, 0)} mV en el ciclo ${c.cy}) durante ${ca.o.vn} muestras seguidas.` + (vth < noise6 ? ` <b style="color:var(--warn)">ΔV = ${fmt(vth, 0)} mV está dentro del ruido del FSR (6σ = ${fmt(noise6, 0)} mV): h₂ puede salir antes de tiempo.</b>` : ` Ruido del FSR: 6σ = ${fmt(noise6, 0)} mV.`);
-  note.innerHTML = `Umbrales del ciclo ${c.cy}: celdas ${fmt(c.Fth - c.Fb, 3)} N sobre la base (ruido ${fmt(c.Fs, 4)} N) · FSR ${fmt(c.Vth - c.Vb, 0)} mV sobre la base de ${fmt(c.Vb, 0)} mV (ruido ${fmt(c.Vs, 1)} mV). h₁ se extrapola con F^(2/3) ∝ (z − h₁), que es la forma de Hertz al empezar el contacto (por umbral: ${fmt(c.h1th, 3)} mm). Indentación corregida d = z − h₁ − C·F con C = ${fmt(ca.o.C, 4)} mm/N. Hertz con R = ${fmt(ca.o.R, 1)} mm y ν = ${fmt(ca.o.nu, 2)} hasta d = ${fmt(ca.o.dFit, 2)} mm.`;
+  const noise6 = 6 * median(ca.cyc.map(q => q.Vs));
+  $('#aVthNote').innerHTML = `h₂ es donde el voltaje del FSR sube ΔV por encima de su voltaje en reposo (${fmt(c.Vb, 0)} mV en el ciclo ${c.cy}) durante ${ca.o.vn} muestras seguidas. Se busca desde que el punzón sale de la base, no desde h₁: si el FSR responde primero, Δh sale negativo.` + (vth < noise6 ? ` <b style="color:var(--warn)">ΔV = ${fmt(vth, 0)} mV está dentro del ruido del FSR (6σ = ${fmt(noise6, 0)} mV).</b>` : ` Ruido del FSR: 6σ = ${fmt(noise6, 0)} mV.`);
+  const nPre = ca.cyc.filter(q => q.h2 != null && q.h2 < q.h1).length;
+  note.innerHTML = `<b>Cómo se calcula (ciclo ${c.cy}).</b> Base: los primeros ${fmt(R_[c.nBase - 1].z - R_[0].z, 2)} mm de la bajada (${c.nBase} líneas, ${c.fresh.filter(i => i < c.nBase).length} lecturas nuevas de las celdas), con mediana y desviación robusta: celdas ${fmt(c.Fb, 4)} N ± ${fmt(c.Fs, 4)} N, FSR ${fmt(c.Vb, 0)} mV ± ${fmt(c.Vs, 1)} mV. ` +
+    `<b>h₁</b>: primera lectura nueva de las celdas que pasa ${fmt(c.Fth - c.Fb, 3)} N sobre la base y las dos siguientes también (por umbral: ${fmt(c.h1th, 3)} mm); se afina con F^(2/3) ∝ (z − h₁). Las fuerzas van adelantadas ${fmt(ca.o.lag, 0)} ms por el retraso del HX711 (a ${fmt(c.v, 3)} mm/s equivale a ${fmt(c.lagmm, 3)} mm). ` +
+    `<b>h₂</b>: primera línea donde el FSR pasa ΔV = ${fmt(c.Vth - c.Vb, 0)} mV durante ${ca.o.vn} líneas. <b>Resolución</b>: las celdas leen cada ≈ ${fmt(c.res, 3)} mm a esta velocidad; un Δh menor que eso no se puede medir: baja la velocidad (0,05 mm/s da ≈ 0,005 mm). ` +
+    `Promedios con ${ca.used.length} de ${ca.cyc.length} ciclos (marca o desmarca en «Usar»).` + (nPre ? ` <b style="color:var(--warn)">En ${nPre} ciclo(s) el FSR respondió antes que las celdas.</b>` : '') +
+    ` Indentación d = z − h₁ − C·F con C = ${fmt(ca.o.C, 4)} mm/N; Hertz con R = ${fmt(ca.o.R, 1)} mm y ν = ${fmt(ca.o.nu, 2)} hasta d = ${fmt(ca.o.dFit, 2)} mm.`;
 }
+$('#contactTbl').addEventListener('change', e => {const cy = e.target.dataset.cyc; if (cy == null) return; USE_OVR.set((DS[curDS] ? DS[curDS].name : '') + '|' + cy, e.target.checked); analyze()});
+$('#aCyc').addEventListener('change', () => {CYC_SEL = +$('#aCyc').value; analyze()});
 $('#aR').value = P.Rd; $('#aDf').value = +(0.15 * P.Rd).toFixed(2); $('#aC').value = RIG.C;
-const ATH = Object.assign({vth: 50, vn: 5}, store.get('fsrThr', {})); $('#aVth').value = ATH.vth; $('#aVn').value = ATH.vn;
-['aVth', 'aVn'].forEach(id => $('#' + id).addEventListener('change', () => {ATH.vth = +$('#aVth').value || 50; ATH.vn = Math.max(1, Math.round(+$('#aVn').value || 5)); store.set('fsrThr', ATH); analyze()}));
+const ATH = Object.assign({vth: 50, vn: 5, fth: 0.01, lag: 250}, store.get('fsrThr', {})); $('#aVth').value = ATH.vth; $('#aVn').value = ATH.vn; $('#aFth').value = ATH.fth; $('#aLag').value = ATH.lag;
+['aVth', 'aVn', 'aFth', 'aLag'].forEach(id => $('#' + id).addEventListener('change', () => {ATH.vth = +$('#aVth').value || 50; ATH.vn = Math.max(1, Math.round(+$('#aVn').value || 5)); ATH.fth = Math.max(0.001, +$('#aFth').value || 0.01); ATH.lag = Math.max(0, +$('#aLag').value || 0); store.set('fsrThr', ATH); analyze()}));
 $('#thrSens').addEventListener('click', e => {const b = e.target.closest('[data-thr]'); if (!b) return; $('#aVth').value = b.dataset.thr; $('#aVth').dispatchEvent(new Event('change'))});
 function updRigNote() {const C = +$('#aC').value || 0; $('#aRigNote').textContent = C ? `C = ${fmt(C, 4)} mm/N → rigidez del montaje ${fmt(1 / C, 0)} N/mm${RIG.from ? ' (de «' + RIG.from + '»)' : ''}.` : 'C = 0: sin corrección. Mídela una vez con un bloque rígido en lugar de la cúpula.'}
 ['aR', 'aNu', 'aDf', 'aC'].forEach(id => $('#' + id).addEventListener('change', () => {if (id === 'aC') {RIG.C = +$('#aC').value || 0; RIG.from = ''; store.set('fsrRig', RIG)} updRigNote(); analyze()}));
-$('#aRig').onclick = () => {const d = DS[curDS]; if (!d) return; const c = compliance(d.rows);
+$('#aRig').onclick = () => {const d = DS[curDS]; if (!d) return; const c = compliance(alignForce(d.rows, Math.max(0, +$('#aLag').value || 0) / 1000));
   if (!c || !(c.C > 0)) {toast('No pude medir la flexibilidad: necesito un tramo de carga con más de 0,5 N'); return}
   RIG.C = c.C; RIG.from = d.name; store.set('fsrRig', RIG); $('#aC').value = +c.C.toFixed(5); updRigNote(); toast(`Montaje: C = ${fmt(c.C, 4)} mm/N (R² ${fmt(c.r2, 3)})`); analyze()};
-$('#aDead').onclick = () => {if (!AN || !AN.ca) return; const dz = AN.ca.cyc.filter(c => c.h2 != null).map(c => c.h2 - c.h1); if (!dz.length) {toast('Este ensayo no tiene el instante en que responde el FSR'); return}
-  const [m] = meanSd(dz); P.dDead = +m.toFixed(3); store.set('fsrP', P); buildParams(); drawModel(); toast(`Retardo del modelo virtual: ${fmt(m, 3)} mm`)};
+$('#aDead').onclick = () => {if (!AN || !AN.ca) return; const dz = AN.ca.used.filter(c => c.h2 != null).map(c => c.h2 - c.h1); if (!dz.length) {toast('No hay ciclos usados con el instante en que responde el FSR'); return}
+  const m = Math.max(0, median(dz)); P.dDead = +m.toFixed(3); store.set('fsrP', P); buildParams(); drawModel(); toast(`Retardo del modelo virtual: ${fmt(m, 3)} mm`)};
 updRigNote();
 let AN = null;
 function analyze() {
   const d = DS[curDS];
   if (!d) {$('#kpis').innerHTML = ''; $('#aNotes').textContent = ''; ['cA', 'cAT', 'cAD'].forEach(id => {const c = canvasCtx($('#' + id)); if (c) {c.g.fillStyle = CSSV['--ink-2']; c.g.font = '13px Barlow,sans-serif'; c.g.textAlign = 'center'; c.g.fillText('Sin datos', c.w / 2, c.h / 2)}}); return}
-  const rows = d.rows, fmin = +$('#aFmin').value || 0.2, ca = contactAnalysis(rows), vOn = ca.cyc.length ? Math.max(...ca.cyc.map(c => c.Vth)) : 0;
+  const rows = alignForce(d.rows, Math.max(0, +$('#aLag').value || 0) / 1000), fmin = +$('#aFmin').value || 0.2, ca = contactAnalysis(rows), vOn = ca.used.length ? median(ca.used.map(c => c.Vth)) : 0;
   const ok = rows.filter(r => r.F > fmin && r.V > vOn && Number.isFinite(r.R) && r.R > 0 && r.R < 4e6);   // el ajuste del sensor solo usa lo que el FSR ya ve
   let pw = null, ln = null;
   if (ok.length > 10) {const f = linfit(ok.map(r => Math.log(r.F)), ok.map(r => Math.log(r.R))); pw = {A: Math.exp(f.a), n: -f.b, r2: f.r2};
@@ -1466,10 +1521,11 @@ function analyze() {
   const Fmax = Math.max(...rows.map(r => r.F)), hy = hysteresis(rows), rp = repeatability(rows), dr = drift(rows);
   const sens = ln ? ln.k : NaN;
   AN = {name: d.name, pw, ln, Fmax, hy, rp, dr, n: rows.length, dur: rows[rows.length - 1].t - rows[0].t, ca};
-  const dz = ca.cyc.filter(c => c.h2 != null).map(c => c.h2 - c.h1), fo = ca.cyc.filter(c => c.Fon != null).map(c => c.Fon), Ee = ca.cyc.filter(c => c.hz).map(c => c.hz.E * 1000), Wd = ca.cyc.filter(c => c.Wd != null).map(c => c.Wd), Wl = ca.cyc.filter(c => c.Wl != null).map(c => c.Wl);
+  const U = ca.used, dz = U.filter(c => c.h2 != null).map(c => c.h2 - c.h1), fo = U.filter(c => c.Fon != null).map(c => c.Fon), Ee = U.filter(c => c.hz).map(c => c.hz.E * 1000), Wd = U.filter(c => c.Wd != null).map(c => c.Wd), Wl = U.filter(c => c.Wl != null).map(c => c.Wl);
+  const dzMed = median(dz), foMed = median(fo), resMed = median(U.map(c => c.res)), nPre = ca.cyc.filter(c => c.h2 != null && c.h2 < c.h1).length;
   const [dzm, dzs] = meanSd(dz), [fom, fos] = meanSd(fo), [Em, Esd] = meanSd(Ee), [Wdm] = meanSd(Wd), [Wlm] = meanSd(Wl);
-  const k1 = ca.cyc.filter(c => c.hz).map(c => 1.5 * c.hz.A); const [k1m] = meanSd(k1);
-  Object.assign(AN, {dzm, dzs, fom, fos, Em, Esd, k1m, Wdm, Wlm, nc: ca.cyc.length});
+  const k1 = U.filter(c => c.hz).map(c => 1.5 * c.hz.A); const [k1m] = meanSd(k1);
+  Object.assign(AN, {dzm, dzs, dzMed, fom, fos, foMed, Em, Esd, k1m, Wdm, Wlm, nc: ca.cyc.length, nu: U.length});
   $('#kpis').innerHTML = [
     ['Ajuste de potencia', pw ? `R = ${fmt(pw.A, 0)}·F^−${fmt(pw.n, 3)}` : '—', pw ? 'R² = ' + fmt(pw.r2, 4) : 'pocos puntos'],
     ['Conductancia lineal', ln ? `${fmt(ln.k, 2)} µS/N` : '—', ln ? `G₀ = ${fmt(ln.g0, 2)} µS · R² = ${fmt(ln.r2, 4)}` : ''],
@@ -1477,8 +1533,8 @@ function analyze() {
     ['Repetibilidad', Number.isFinite(rp) ? fmt(rp, 2) + ' %' : '—', 'desviación entre ciclos (carga)'],
     ['Deriva en la pausa', Number.isFinite(dr) ? fmt(dr, 2) + ' %/min' : '—', 'cambio de V con carga sostenida'],
     ['Fuerza máxima', fmt(Fmax, 2) + ' N', `${rows.length} muestras · ${fmt(AN.dur, 1)} s`],
-    ['Retardo del FSR Δh', Number.isFinite(dzm) ? fmt(dzm, 3) + ' mm' : '—', Number.isFinite(dzm) ? `± ${fmt(dzs, 3)} mm · ${dz.length} ciclos · ${fmt(dzm / (DH.status && +DH.status[13] ? +DH.status[13] : P.lead), 2)} vueltas` : 'usa el ensayo Contacto y rigidez'],
-    ['Fuerza mínima que detecta', Number.isFinite(fom) ? fmt(fom, 3) + ' N' : '—', Number.isFinite(fom) ? `± ${fmt(fos, 3)} N · ≈ ${fmt(fom / G * 1000, 0)} g` : ''],
+    ['Retardo del FSR Δh', Number.isFinite(dzMed) ? fmt(dzMed, 3) + ' mm' : '—', Number.isFinite(dzMed) ? `mediana de ${dz.length} de ${ca.cyc.length} ciclos · media ${fmt(dzm, 3)} ± ${fmt(dzs, 3)} · ${fmt(dzMed / (DH.status && +DH.status[13] ? +DH.status[13] : P.lead), 2)} vueltas · resolución ≈ ${fmt(resMed, 3)} mm` + (nPre ? ` · en ${nPre} ciclos el FSR respondió primero` : '') : (ca.cyc.length ? `ningún ciclo válido de ${ca.cyc.length}: revisa la columna «Revisión»` : 'usa el ensayo Contacto y rigidez')],
+    ['Fuerza mínima que detecta', Number.isFinite(foMed) ? fmt(foMed, 3) + ' N' : '—', Number.isFinite(foMed) ? `mediana · media ${fmt(fom, 3)} ± ${fmt(fos, 3)} N · ≈ ${fmt(foMed / G * 1000, 0)} g` : ''],
     ['Módulo E (Hertz)', Number.isFinite(Em) ? fmt(Em, 0) + ' kPa' : '—', Number.isFinite(Em) ? `± ${fmt(Esd, 0)} kPa · rigidez a 1 mm ≈ ${fmt(k1m, 2)} N/mm` : 'necesita tramos de carga desde antes del contacto'],
     ['Energía disipada', Number.isFinite(Wdm) ? fmt(Wdm, 2) + ' mJ' : '—', Number.isFinite(Wdm) && Wlm > 0 ? `${fmt(100 * Wdm / Wlm, 0)} % de la energía de carga` : '']
   ].map(([k, v, s]) => `<div class="kpi">${k}<b>${v}</b><span>${s}</span></div>`).join('');
@@ -1502,7 +1558,7 @@ function analyze() {
     series: [{xs: ts, ys: rows.map(r => r.F), color: CSSV['--ink'], lw: 1.6}, {xs: ts, ys: rows.map(r => r.V * vScale), color: CSSV['--accent'], lw: 1.2}]});
   legend($('#lgAT'), [[CSSV['--ink'], 'F (N)'], [CSSV['--accent'], 'V FSR (escalado al eje)']]);
   if (ca.cyc.length) {
-    const c0 = ca.cyc[0], ind = rows.filter(r => r.cy === c0.cy && (r.ph === 1 || r.ph === 3) && r.z > c0.h1).map(r => {const F = r.F - c0.Fb; return {d: r.z - c0.h1 - ca.o.C * F, F, ph: r.ph}}).filter(p => p.d > 0);
+    const c0 = ca.cyc.find(q => q.cy === CYC_SEL) || ca.used[0] || ca.cyc[0], ind = rows.filter(r => r.cy === c0.cy && (r.ph === 1 || r.ph === 3) && r.z > c0.h1).map(r => {const F = r.F - c0.Fb; return {d: r.z - c0.h1 - ca.o.C * F, F, ph: r.ph}}).filter(p => p.d > 0);
     const dmx = Math.max(0.5, ...ind.map(p => p.d)), hx = [], hy = []; for (let i = 0; i <= 80; i++) {const dd = dmx * i / 80; hx.push(dd); hy.push(c0.hz ? c0.hz.A * Math.pow(dd, 1.5) : NaN)}
     plot($('#cAD'), {xLo: 0, xHi: dmx, yLo: 0, yHi: Math.max(0.5, ...ind.map(p => p.F)) * 1.1, xLabel: 'indentación d (mm)', yLabel: 'N',
       vrefs: [{x: ca.o.dFit, color: CSSV['--ink-3'], label: 'límite del ajuste', right: true}].concat(c0.h2 != null ? [{x: c0.h2 - c0.h1, color: CSSV['--accent'], label: 'FSR responde', dy: 14}] : []),
@@ -1575,7 +1631,8 @@ $('#aRes').onclick = () => {if (!AN) return; const a = AN;
     ['conductancia_k_uS_por_N', a.ln ? a.ln.k.toFixed(4) : ''], ['conductancia_G0_uS', a.ln ? a.ln.g0.toFixed(4) : ''], ['conductancia_R2', a.ln ? a.ln.r2.toFixed(5) : ''], ['histeresis_pct', Number.isFinite(a.hy) ? a.hy.toFixed(3) : ''], ['repetibilidad_pct', Number.isFinite(a.rp) ? a.rp.toFixed(3) : ''], ['deriva_pct_min', Number.isFinite(a.dr) ? a.dr.toFixed(3) : ''],
     ['retardo_fsr_mm', Number.isFinite(a.dzm) ? a.dzm.toFixed(4) : ''], ['retardo_fsr_sd_mm', Number.isFinite(a.dzs) ? a.dzs.toFixed(4) : ''], ['fuerza_minima_N', Number.isFinite(a.fom) ? a.fom.toFixed(4) : ''],
     ['E_hertz_kPa', Number.isFinite(a.Em) ? a.Em.toFixed(1) : ''], ['E_hertz_sd_kPa', Number.isFinite(a.Esd) ? a.Esd.toFixed(1) : ''], ['rigidez_1mm_N_por_mm', Number.isFinite(a.k1m) ? a.k1m.toFixed(3) : ''], ['energia_disipada_mJ', Number.isFinite(a.Wdm) ? a.Wdm.toFixed(3) : ''],
-    ['R_cupula_mm', a.ca.o.R], ['nu', a.ca.o.nu], ['C_montaje_mm_por_N', a.ca.o.C], ['umbral_fsr_mV', a.ca.o.vth], ['umbral_fsr_muestras', a.ca.o.vn]].concat(a.ca.cyc.map(c => [`ciclo_${c.cy}_h1_h2_mm`, `${c.h1.toFixed(4)};${c.h2 != null ? c.h2.toFixed(4) : ''}`]));
+    ['R_cupula_mm', a.ca.o.R], ['nu', a.ca.o.nu], ['C_montaje_mm_por_N', a.ca.o.C], ['umbral_fsr_mV', a.ca.o.vth], ['umbral_fsr_muestras', a.ca.o.vn], ['umbral_celdas_min_N', a.ca.o.fmin], ['retraso_celdas_ms', a.ca.o.lag], ['retardo_fsr_mediana_mm', Number.isFinite(a.dzMed) ? a.dzMed.toFixed(4) : ''], ['ciclos_usados', `${a.nu} de ${a.nc}`]]
+    .concat(a.ca.cyc.map(c => [`ciclo_${c.cy}`, `usado=${c.use ? 1 : 0};h1=${c.h1.toFixed(4)};h2=${c.h2 != null ? c.h2.toFixed(4) : ''};dh=${c.h2 != null ? (c.h2 - c.h1).toFixed(4) : ''};F_on=${c.Fon != null ? c.Fon.toFixed(4) : ''};V_base=${c.Vb.toFixed(1)};F_base=${c.Fb.toFixed(4)};${c.flags.join(' / ')}`]));
   saveText('parametro,valor\n' + rows.map(r => r.join(',')).join('\n') + '\n', `resultados-fsr-${stamp()}.csv`)};
 
 /* ensayo de ejemplo: se corre el banco virtual sin dibujar */
