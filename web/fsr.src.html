@@ -237,6 +237,21 @@ fieldset.pg legend{font-family:var(--mono);font-size:11px;letter-spacing:.06em;t
 .plist input{margin-top:3px;accent-color:var(--ok)}
 .plist input:checked~span{color:var(--ink-3);text-decoration:line-through}
 .plist label.hl{background:var(--accent-bg)}
+
+/* lista antes de tomar datos */
+details.pre{background:var(--sheet);border:1.5px solid var(--accent);border-radius:6px}
+details.pre>summary{list-style:none;cursor:pointer;display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;padding:12px 16px}
+details.pre>summary::-webkit-details-marker{display:none}
+details.pre>summary h2{flex:1 1 auto}
+.prebody{padding:0 16px 14px;display:flex;flex-direction:column;gap:10px}
+.prelist{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:4px 18px;margin:0;padding:0;list-style:none;counter-reset:pk}
+.prelist li{counter-increment:pk;display:grid;grid-template-columns:20px 24px minmax(0,1fr) auto;gap:6px;align-items:start;padding:6px 4px;border-bottom:1px solid var(--rule);font-size:13.5px}
+.prelist li::before{content:counter(pk);grid-column:2;grid-row:1;font-family:var(--mono);color:var(--accent);font-size:12.5px;padding-top:1px}
+.prelist input{grid-column:1;grid-row:1;margin-top:3px;accent-color:var(--ok)}
+.prelist span{grid-column:3;grid-row:1}
+.prelist .btn{grid-column:4;grid-row:1}
+.prelist input:checked~span{color:var(--ink-3);text-decoration:line-through}
+.prelist .tag{display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}
 </style>
 </head>
@@ -270,6 +285,13 @@ fieldset.pg legend{font-family:var(--mono);font-size:11px;letter-spacing:.06em;t
   <section class="panel" id="p-ensayo" role="tabpanel" aria-labelledby="t-ensayo">
     <div class="ens">
       <div class="main">
+        <details class="pre" id="preCard" open>
+          <summary><h2>Antes de tomar datos</h2><span class="small muted mono" id="preCount">0 / 0</span><div class="prog" style="flex:0 1 160px;height:8px;border-radius:4px;background:var(--grid);overflow:hidden"><i id="preBar" style="display:block;height:100%;width:0;background:var(--ok)"></i></div></summary>
+          <div class="prebody">
+            <ol class="prelist" id="preList"></ol>
+            <div class="row"><button class="btn sm" id="preReset">Empezar de nuevo</button><span class="small muted">Se guarda en este navegador. Los botones de la derecha mandan el comando al ESP32.</span></div>
+          </div>
+        </details>
         <div class="card">
           <div class="card-head"><h2>Prensa</h2><span class="small muted" id="pressState">—</span></div>
           <div class="press"><canvas id="press" aria-label="Vista lateral animada de la prensa: motor, tornillo, punzón, cúpula de silicona y celdas de carga"></canvas></div>
@@ -1176,6 +1198,46 @@ function updReadouts() {
     ['Pasos perdidos', vb ? fmt(vb.lost, 3) + ' mm' : '—'], ['Muestras', String(DH.s.length)]].map(([k, v]) => `<div>${k}<b>${v}</b></div>`).join('');
   updRec(); updLiveSchem();
 }
+
+/* ================= lista antes de tomar datos ================= */
+const PRE = [
+  ['Montaje', 'Punzón por lo menos 1 cm por encima de la cúpula y nada tocando las celdas'],
+  ['Montaje', 'Shield: puente V en 3V3 y conector DC sin conectar'],
+  ['Montaje', 'Si cambiaste el código: subir fsr_ensayo (Upload Speed 115200, sin los 12 V)'],
+  ['Conexión', 'Cerrar el Monitor Serie y el Serial Plotter de Arduino IDE'],
+  ['Conexión', 'Conectar el USB del ESP32 al computador'],
+  ['Conexión', 'Conectar la fuente de 12 V del motor (siempre después del USB)'],
+  ['Conexión', 'Fuente de datos: ESP32 por USB → Conectar', 'usb'],
+  ['Conexión', 'Revisar el estado: «límites 40 N y 2500 mV», Rm 10 kΩ, modo suma', 's'],
+  ['Sensores', 'Esperar ~5 min encendido para que las celdas se estabilicen'],
+  ['Sensores', 'Sin carga: FSR en su base (~140 mV) y fuerza cerca de 0 N'],
+  ['Sensores', 'Tara sin contacto', 't'],
+  ['Sensores', 'Si moviste la cúpula o la plataforma: calibrar con la masa donde presiona el punzón (gramos en «Calibrar celdas»)', 'cs'],
+  ['Sensores', 'Verificar: quitar la masa (F ≈ 0), ponerla (F = m · 9,81) y presionar hacia abajo (F positiva)'],
+  ['Motor', 'Motor con fuerza: el eje queda duro', 'e'],
+  ['Motor', 'Probar +0,05 y −0,05 a 0,05 mm/s: + baja y − sube'],
+  ['Ensayo', 'Buscar contacto: z = 0 en el toque y queda 0,5 mm arriba', 'h'],
+  ['Ensayo', 'Acondicionar el FSR: 5 ciclos sin grabar', 'r 3 1 0 5'],
+  ['Ensayo', 'Elegir el ensayo, marcar «Grabar automáticamente» e Iniciar ensayo'],
+  ['Al terminar', 'Guardar CSV y Llevar a Análisis'],
+  ['Al terminar', 'Soltar el motor, quitar los 12 V y después el USB', 'd']
+];
+let PREDONE = store.get('fsrPre', {});
+function buildPre() {
+  $('#preList').innerHTML = PRE.map(([tag, txt, act], i) => {
+    const lab = act === 'usb' ? 'Conectar' : act === 'cs' ? 'cs' : act;
+    return `<li><input type="checkbox" data-pre="${i}" id="pre${i}" ${PREDONE[i] ? 'checked' : ''}><span><label for="pre${i}" style="cursor:pointer"><span class="tag">${tag}</span>${esc(txt)}</label></span>${act ? `<button class="btn sm" data-preact="${esc(act)}">${esc(lab)}</button>` : ''}</li>`}).join('');
+  updPre();
+}
+function updPre() {const n = PRE.filter((_, i) => PREDONE[i]).length; $('#preCount').textContent = `${n} / ${PRE.length}`; $('#preBar').style.width = (100 * n / PRE.length) + '%'}
+$('#preList').addEventListener('change', e => {const i = e.target.dataset.pre; if (i == null) return; PREDONE[i] = e.target.checked; store.set('fsrPre', PREDONE); updPre()});
+$('#preList').addEventListener('click', e => {const b = e.target.closest('[data-preact]'); if (!b) return; e.preventDefault(); const a = b.dataset.preact;
+  if (a === 'usb') {setSource('usb'); connect(); return}
+  if (a === 'cs') {send('cs ' + (+$('#calG').value || 500)); return}
+  if (SRC.kind === 'usb' && !SRC.port) {toast('Conecta primero el ESP32 (paso 7)'); return}
+  send(a)});
+$('#preReset').onclick = () => {PREDONE = {}; store.set('fsrPre', PREDONE); buildPre()};
+buildPre();
 
 /* ================= controles de Ensayo ================= */
 $$('#srcSeg button').forEach(b => b.onclick = () => setSource(b.dataset.src));

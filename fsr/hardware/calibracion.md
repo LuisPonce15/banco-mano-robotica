@@ -1,5 +1,30 @@
 # Calibración y protocolo de ensayo
 
+## Antes de tomar datos
+
+1. Punzón por lo menos 1 cm por encima de la cúpula y nada tocando las celdas.
+2. Shield: puente V en 3V3 y conector DC sin conectar.
+3. Si cambiaste el código: subir `fsr_ensayo` (Upload Speed 115200, sin los 12 V).
+4. Cerrar el Monitor Serie y el Serial Plotter de Arduino IDE.
+5. Conectar el USB del ESP32.
+6. Conectar la fuente de 12 V (siempre después del USB).
+7. Página → Ensayo → ESP32 por USB → Conectar.
+8. `s`: revisar «límites 40 N y 2500 mV», Rm 10 kΩ y modo suma.
+9. Esperar ~5 min para que las celdas se estabilicen.
+10. Sin carga: FSR en su base (~140 mV) y fuerza cerca de 0 N.
+11. `t` (tara sin contacto).
+12. Si moviste la cúpula o la plataforma: `cs` con la masa donde presiona el punzón.
+13. Verificar: sin masa F ≈ 0, con masa F = m · 9,81, y presionar hacia abajo da F positiva.
+14. `e`: el eje del motor queda duro.
+15. +0,05 y −0,05 a 0,05 mm/s: + baja y − sube.
+16. `h`: z = 0 en el toque.
+17. `r 3 1 0 5`: 5 ciclos de acondicionamiento sin grabar.
+18. Elegir el ensayo, marcar «Grabar automáticamente» e iniciar.
+19. Al terminar: guardar el CSV y llevarlo a Análisis.
+20. `d`, quitar los 12 V y después el USB.
+
+La pestaña **Ensayo** de la página tiene esta lista con casillas y botones que mandan cada comando.
+
 ## Celdas de carga
 
 El firmware trae un factor teórico (≈ 21 900 cuentas por newton para una celda de 10 kg y 1 mV/V), pero cada celda es distinta en ±15 %. Calibra una vez; el factor queda guardado en el ESP32.
