@@ -17,10 +17,11 @@
 
 struct Cell {
   const char* name; int dt, sck;
-  long raw = 0, off = 0; bool ok = false; uint32_t n = 0, tLast = 0;
-  double s = 0, s2 = 0; int ns = 0; float noise = 0;
+  long raw, off; bool ok; uint32_t n, tLast;
+  double s, s2; int ns; float noise;
+  Cell(const char* nm, int d, int k) : name(nm), dt(d), sck(k), raw(0), off(0), ok(false), n(0), tLast(0), s(0), s2(0), ns(0), noise(0) {}
 };
-Cell c1 = {"Celda 1", 16, 17}, c2 = {"Celda 2", 18, 19};
+Cell c1("Celda 1", 16, 17), c2("Celda 2", 18, 19);
 const float COUNTS_PER_G = 214.8f;   // teórico: 10 kg, 1 mV/V, ganancia 128 (≈ 21 900 cuentas/N)
 char mode = 'x';
 portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
