@@ -1378,11 +1378,18 @@ async function wzMove(dz) {           // movimiento relativo y espera a que z ll
 }
 // busca el contacto bajando de a «step» mm y leyendo con el motor quieto: sin el retraso del HX711, sin pasarse
 async function wzSeek(step, maxMM, label) {
-  await sleep(1500); const b = wzRead(1200); let moved = 0;
+  // La base se va actualizando (las celdas derivan unas décimas de newton después de cargarlas) y el toque
+  // cuenta solo si la fuerza sube en dos escalones seguidos y el segundo es mayor: el ruido o la deriva no lo cumplen.
+  await sleep(1500); const b = wzRead(1200), hist = []; let moved = 0, cand = null;
+  const thr = Math.max(0.15, 4 * (b.sd || 0.05) / Math.sqrt(Math.max(1, b.n / 3)));
   while (moved < maxMM - 1e-9) {
     await wzMove(step); moved += step; await sleep(450); const r = wzRead(350);
-    wzSay(`${label}: bajé ${fmt(moved, 2)} mm · F = ${fmt(r.F - b.F, 3)} N · FSR = ${fmt(r.V, 0)} mV`);
-    if (r.F - b.F > Math.max(0.15, 3 * b.sd / Math.sqrt(Math.max(1, r.n))) || r.V - b.V > 30) return {moved, F: r.F - b.F, V: r.V};
+    const base = hist.length >= 3 ? median(hist.slice(-6)) : b.F, up = r.F - base;
+    wzSay(`${label}: bajé ${fmt(moved, 2)} mm · F = ${fmt(up, 3)} N sobre la base (umbral ${fmt(thr, 2)} N) · FSR = ${fmt(r.V, 0)} mV`);
+    logLine(`buscando: ${fmt(moved, 2)} mm · z ${fmt(DH.last ? DH.last.z : NaN, 3)} · F ${fmt(r.F, 3)} (base ${fmt(base, 3)}) · V ${fmt(r.V, 0)}`, 'sys');
+    if (r.V - b.V > 30) return {moved: cand ? cand.moved : moved, F: up, V: r.V, by: 'FSR'};
+    if (up > thr) {if (cand && r.F > cand.F + 0.5 * thr) return {moved: cand.moved, F: cand.up, V: r.V, by: 'celdas'}; if (!cand) cand = {moved, F: r.F, up}}
+    else {cand = null; hist.push(r.F)}
   }
   throw new Error(`no encontré contacto en ${maxMM} mm: ¿el punzón está sobre la muestra?`);
 }
@@ -1398,7 +1405,7 @@ async function wizard(kind) {
     if (kind === 'rig') {
       await wzCmd('f 10', 'Límite de fuerza bajo');
       const c = await wzSeek(0.05, 19, 'Bajando hasta el bloque');
-      const back = Math.min(0.5, c.moved - 0.6); if (back < 0.2) throw new Error('el punzón empezó casi tocando el bloque: súbelo por lo menos 2 mm');
+      const back = Math.min(0.5, c.moved - 0.6); if (back < 0.2) throw new Error(`detecté el toque (${c.by}: ${fmt(c.F, 2)} N) después de bajar solo ${fmt(c.moved, 2)} mm. Si el punzón de verdad estaba lejos, mándame una captura del registro; si no, súbelo por lo menos 2 mm`);
       await wzMove(-back); await wzCmd('z', `z = 0 a ${fmt(back, 2)} mm del bloque`); startZ = -(c.moved - back);
       WZ.alto = null; const d = await wzTest('p 0.01 99 1 0.1', 'Escalones contra el bloque (para en 10 N)', 400);
       WZ.alto = null; await wzIdle(30); await wzCmd('f 40', 'Límite de fuerza normal'); await goStart();
@@ -1408,7 +1415,7 @@ async function wizard(kind) {
     } else {
       await wzCmd('vl 2000', 'Límite del FSR'); await wzCmd('f 22', 'Límite de fuerza de seguridad');
       const c = await wzSeek(0.1, 19, 'Bajando hasta la cúpula');
-      if (c.moved < 4.1) throw new Error(`el punzón empezó solo ${fmt(c.moved, 1)} mm arriba de la cúpula: súbelo por lo menos 5 mm (mejor 1 cm) y vuelve a intentar`);
+      if (c.moved < 4.1) throw new Error(`detecté el toque (${c.by}: ${fmt(c.F, 2)} N) después de bajar solo ${fmt(c.moved, 1)} mm: el punzón tiene que empezar por lo menos 5 mm arriba de la cúpula (mejor 1 cm)`);
       const back = 3.5; await wzMove(-back); await wzCmd('z', 'z = 0 a 3,5 mm del primer toque (en el aire)'); startZ = -(c.moved - back);
       WZ.alto = null; const d = await wzTest('p 0.05 99 1 0.2', 'Escalones sobre la cúpula', 700);
       WZ.alto = null; await wzIdle(30); await wzCmd('f 40', 'Límite de fuerza normal'); await goStart();
