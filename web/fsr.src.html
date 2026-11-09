@@ -372,11 +372,12 @@ details.pre>summary h2{flex:1 1 auto}
               <b>Medición guiada</b>: la página manda cada comando, espera a que el motor termine, pone límites de fuerza bajos para que el motor no se fuerce y al final actualiza los parámetros.
               <button class="btn" id="wzRig">1 · Montaje rígido: bloque en vez de la cúpula → C</button>
               <button class="btn pri" id="wzDome">2 · Cúpula: retardo del FSR y rigidez → Δh</button>
-              <div class="row"><button class="btn sm" id="wzStop" disabled>Detener</button><span class="small muted">Antes de cada uno: punzón por lo menos 1 cm arriba y nada tocando las celdas (hace la tara al empezar).</span></div>
+              <div class="row"><button class="btn sm" id="wzStop" disabled>Detener</button><span class="small muted">Antes de cada uno: punzón ≈ 1 cm arriba de la muestra y nada más tocando las celdas (hace la tara al empezar y vuelve ahí al final).</span></div>
               <p class="small" id="wzState" aria-live="polite"></p>
               <details class="small"><summary>Qué hace cada uno</summary>
-                <p><b>1 · Montaje rígido</b> (una vez, o si cambias el montaje): <code>t</code> · <code>e</code> · <code>f 10</code> (si la fuerza pasa 10 N, para y sube 1 mm) · <code>h</code> · <code>z</code> (z = 0 a 0,5 mm del bloque) · <code>p 0.01 99 1 0.1</code> (escalones de 0,01 mm, 1 s quieto). Al terminar vuelve a <code>f 40</code> y calcula <b>C</b> = cuánto se mueve z por newton con algo que no se deforma: es lo que ceden el marco, la varilla y las celdas. Queda guardado y se resta en el análisis de la cúpula.</p>
-                <p><b>2 · Cúpula</b>: <code>t</code> · <code>e</code> · <code>vl 2000</code> (apenas el FSR responde bien, deja de bajar) · <code>f 22</code> (por si el FSR no responde) · <code>h</code> · <code>m -2.5</code> · <code>z</code> (empieza 3 mm por encima del punto que encontró h) · <code>p 0.05 99 1 0.2</code> (~4 min). Al terminar vuelve a <code>f 40</code>, calcula h₁, h₂ y Δh con el motor quieto en cada escalón y lleva Δh al modelo virtual.</p>
+                <p><b>Antes de cada botón</b>, deja el punzón donde quieras que empiece, <b>bien arriba</b> (≈ 1 cm sobre el bloque o la cúpula, con espacio para cambiarlos). El asistente no usa <code>h</code>: baja de a poco y lee con el motor quieto, así encuentra el primer toque sin pasarse. Al terminar (o si algo falla) <b>vuelve a esa altura</b>.</p>
+                <p><b>1 · Montaje rígido</b> (una vez, o si cambias el montaje): <code>t</code> · <code>e</code> · <code>z</code> · <code>f 10</code> · baja de a 0,05 mm hasta que las celdas pasen 0,15 N · sube 0,5 mm · <code>z</code> · <code>p 0.01 99 1 0.1</code> (para solo en 10 N y sube 1 mm) · <code>f 40</code> · vuelve arriba. Calcula <b>C</b> = cuánto se mueve z por newton con algo que no se deforma (marco, varilla, celdas) y lo guarda.</p>
+                <p><b>2 · Cúpula</b>: <code>t</code> · <code>e</code> · <code>z</code> · <code>vl 2000</code> · <code>f 22</code> · baja de a 0,1 mm hasta el primer toque (celdas > 0,15 N o FSR +30 mV) · sube 3,5 mm · <code>z</code> · <code>p 0.05 99 1 0.2</code> (~4 min; empieza en el aire, así h₁ y h₂ quedan dentro del ensayo) · <code>f 40</code> · vuelve arriba. Calcula h₁, h₂ y Δh y lleva Δh al modelo virtual.</p>
                 <p>Los mismos ensayos se pueden hacer a mano con los campos de arriba e <b>Iniciar ensayo</b>. <b>Comprobación con papel</b>: con el motor quieto, una tira de papel sobre la cúpula; baja con −0,05 hasta que quede prensada y anota z (el toque real, sin depender de las celdas); sigue hasta que suba el FSR y anota z otra vez. Después de cualquiera de estos, para los ensayos normales vuelve a hacer <b>h</b>.</p>
               </details>
             </div>
@@ -1360,30 +1361,66 @@ async function wzTest(cmd, label, maxS) {
   if (DS.length === nDS) throw new Error('no se grabó el ensayo');
   return DS[DS.length - 1];
 }
+// lectura asentada de los últimos ms milisegundos (solo lecturas nuevas del HX711 para la fuerza)
+function wzRead(ms) {
+  const now = DH.last ? DH.last.t : 0, S = DH.s.filter(x => x.t >= now - ms / 1000); if (!S.length) return {F: NaN, V: NaN, sd: NaN, n: 0};
+  const fr = S.filter((x, i) => i === 0 || x.F !== S[i - 1].F), F = fr.reduce((a, x) => a + x.F, 0) / fr.length;
+  return {F, V: S.reduce((a, x) => a + x.V, 0) / S.length, sd: Math.sqrt(fr.reduce((a, x) => a + (x.F - F) ** 2, 0) / Math.max(1, fr.length - 1)), n: fr.length};
+}
+async function wzMove(dz) {           // movimiento relativo y espera a que z llegue (z = cuenta de pasos)
+  if (WZ.abort) throw new Error('detenido por ti'); if (WZ.alto) throw new Error('el firmware se detuvo: ' + WZ.alto);
+  const z0 = DH.last ? DH.last.z : 0, target = z0 + dz; await send('m ' + dz.toFixed(3));
+  const t0 = performance.now(), lim = 3000 + Math.abs(dz) * 2000;
+  while (!(DH.last && Math.abs(DH.last.z - target) < 0.003)) {
+    if (WZ.abort) throw new Error('detenido por ti'); if (WZ.alto) throw new Error('el firmware se detuvo: ' + WZ.alto);
+    if (performance.now() - t0 > lim) throw new Error(`el motor no llegó a z = ${fmt(target, 3)} mm`); await sleep(40);
+  }
+}
+// busca el contacto bajando de a «step» mm y leyendo con el motor quieto: sin el retraso del HX711, sin pasarse
+async function wzSeek(step, maxMM, label) {
+  await sleep(1500); const b = wzRead(1200); let moved = 0;
+  while (moved < maxMM - 1e-9) {
+    await wzMove(step); moved += step; await sleep(450); const r = wzRead(350);
+    wzSay(`${label}: bajé ${fmt(moved, 2)} mm · F = ${fmt(r.F - b.F, 3)} N · FSR = ${fmt(r.V, 0)} mV`);
+    if (r.F - b.F > Math.max(0.15, 3 * b.sd / Math.sqrt(Math.max(1, r.n))) || r.V - b.V > 30) return {moved, F: r.F - b.F, V: r.V};
+  }
+  throw new Error(`no encontré contacto en ${maxMM} mm: ¿el punzón está sobre la muestra?`);
+}
 async function wizard(kind) {
   if (WZ.run) return; if (SRC.kind !== 'virtual' && !SRC.writer) {toast('Conecta el ESP32 primero'); return}
   WZ.run = true; WZ.abort = false; WZ.alto = null; $('#wzStop').disabled = false; $('#wzRig').disabled = $('#wzDome').disabled = true;
+  let startZ = null;      // altura de partida en las coordenadas actuales: al final vuelve ahí
+  const goStart = async () => {if (startZ == null || !DH.last) return; const dz = startZ - DH.last.z; if (Math.abs(dz) > 0.01) {wzSay('Volviendo a la altura de partida'); await wzMove(dz)}};
   try {
-    if (SRC.kind === 'virtual') {SRC.demo = false; startVirtual(false); await sleep(500)}
-    await wzCmd('x', 'Deteniendo cualquier movimiento'); await wzCmd('t', 'Tara (punzón en el aire)'); await wzCmd('e', 'Motor con fuerza');
+    if (SRC.kind === 'virtual') {SRC.demo = false; startVirtual(false); await sleep(500); await send('e'); await sleep(200); await wzMove(-7)}   // banco virtual: punzón ~1 cm arriba, como en el real
+    await wzCmd('x', 'Deteniendo cualquier movimiento'); await wzCmd('t', 'Tara (punzón en el aire)'); await wzCmd('e', 'Motor con fuerza'); await wzCmd('v 1', 'Velocidad manual 1 mm/s');
+    await wzCmd('z', 'z = 0 donde dejaste el punzón (de aquí arranca y aquí vuelve)'); startZ = 0;
     if (kind === 'rig') {
-      await wzCmd('f 10', 'Límite de fuerza bajo'); await wzCmd('h', 'Buscando el bloque', 120); await wzCmd('z', 'z = 0 a 0,5 mm del bloque');
-      WZ.alto = null; const d = await wzTest('p 0.01 99 1 0.1', 'Escalones contra el bloque', 400);
-      await wzCmd('f 40', 'Límite de fuerza normal');
-      const c = complianceFrom(d); if (!c) throw new Error('no encontré escalones con más de 1 N: ¿el punzón llegó al bloque?');
-      RIG.C = c.C; RIG.from = d.name; store.set('fsrRig', RIG); $('#aC').value = +c.C.toFixed(5); updRigNote(); analyze();
-      wzSay(`Listo: <b>C = ${fmt(c.C, 4)} mm/N</b> (rigidez del montaje ${fmt(1 / c.C, 0)} N/mm, ${c.n} escalones, R² ${fmt(c.r2, 3)}). Quedó guardada en Análisis. Ahora pon la cúpula y corre el 2.`, 'ok');
+      await wzCmd('f 10', 'Límite de fuerza bajo');
+      const c = await wzSeek(0.05, 19, 'Bajando hasta el bloque');
+      const back = Math.min(0.5, c.moved - 0.6); if (back < 0.2) throw new Error('el punzón empezó casi tocando el bloque: súbelo por lo menos 2 mm');
+      await wzMove(-back); await wzCmd('z', `z = 0 a ${fmt(back, 2)} mm del bloque`); startZ = -(c.moved - back);
+      WZ.alto = null; const d = await wzTest('p 0.01 99 1 0.1', 'Escalones contra el bloque (para en 10 N)', 400);
+      WZ.alto = null; await wzIdle(30); await wzCmd('f 40', 'Límite de fuerza normal'); await goStart();
+      const cc = complianceFrom(d); if (!cc) throw new Error('no encontré escalones con más de 1 N: ¿el punzón llegó al bloque?');
+      RIG.C = cc.C; RIG.from = d.name; store.set('fsrRig', RIG); $('#aC').value = +cc.C.toFixed(5); updRigNote(); analyze();
+      wzSay(`Listo: <b>C = ${fmt(cc.C, 4)} mm/N</b> (rigidez del montaje ${fmt(1 / cc.C, 0)} N/mm, ${cc.n} escalones, R² ${fmt(cc.r2, 3)}). El punzón volvió a donde lo dejaste. Si necesitas más espacio para la cúpula, súbelo con −1. Después corre el 2.`, 'ok');
     } else {
-      await wzCmd('vl 2000', 'Límite del FSR'); await wzCmd('f 22', 'Límite de fuerza de seguridad'); await wzCmd('h', 'Buscando el contacto', 120);
-      await wzCmd('m -2.5', 'Subiendo 2,5 mm más', 30); await wzCmd('z', 'z = 0 en el aire (3 mm sobre el punto de h)');
+      await wzCmd('vl 2000', 'Límite del FSR'); await wzCmd('f 22', 'Límite de fuerza de seguridad');
+      const c = await wzSeek(0.1, 19, 'Bajando hasta la cúpula');
+      if (c.moved < 4.1) throw new Error(`el punzón empezó solo ${fmt(c.moved, 1)} mm arriba de la cúpula: súbelo por lo menos 5 mm (mejor 1 cm) y vuelve a intentar`);
+      const back = 3.5; await wzMove(-back); await wzCmd('z', 'z = 0 a 3,5 mm del primer toque (en el aire)'); startZ = -(c.moved - back);
       WZ.alto = null; const d = await wzTest('p 0.05 99 1 0.2', 'Escalones sobre la cúpula', 700);
-      await wzCmd('f 40', 'Límite de fuerza normal');
+      WZ.alto = null; await wzIdle(30); await wzCmd('f 40', 'Límite de fuerza normal'); await goStart();
       curDS = DS.indexOf(d); renderDS(); analyze(); const sa = AN && AN.sa;
       if (sa && sa.h1 != null && sa.h2 != null) {const dh = sa.h2 - sa.h1; P.dDead = +Math.max(0, dh).toFixed(3); store.set('fsrP', P); buildParams(); drawModel();
-        wzSay(`Listo: <b>Δh = ${fmt(dh, 3)} ± ${fmt(sa.step, 3)} mm</b> (${fmt(dh / P.lead, 2)} vueltas), FSR responde con ${fmt(sa.Fon, 2)} N. Se llevó al modelo virtual. Detalle en <b>Análisis → Escalones</b>.`, 'ok')}
-      else wzSay(`El ensayo terminó pero no encontré ${sa && sa.h1 == null ? 'h₁ (las celdas no vieron fuerza)' : 'h₂ (el FSR no subió en los 4,95 mm de escalones)'}: mira <b>Análisis → Escalones</b>. Si el FSR no alcanzó a responder, haz el ensayo a mano con paso 0,1 mm.`, 'er');
+        wzSay(`Listo: <b>Δh = ${fmt(dh, 3)} ± ${fmt(sa.step, 3)} mm</b> (${fmt(dh / P.lead, 2)} vueltas), FSR responde con ${fmt(sa.Fon, 2)} N. Se llevó al modelo virtual y el punzón volvió a donde lo dejaste. Detalle en <b>Análisis → Escalones</b>.`, 'ok')}
+      else wzSay(`El ensayo terminó pero no encontré ${sa && sa.h1 == null ? 'h₁ (las celdas no vieron fuerza)' : 'h₂ (el FSR no subió en los 4,95 mm de escalones)'}: mira <b>Análisis → Escalones</b>.`, 'er');
     }
-  } catch (e) {wzSay('Se detuvo: ' + e.message + '. Dejo el límite de fuerza en 40 N.', 'er'); try {await send('x'); await sleep(300); await send('f 40')} catch (_) {}}
+  } catch (e) {
+    const msg = e.message; wzSay('Se detuvo: ' + msg + '. Dejo el límite de fuerza en 40 N.', 'er');
+    try {await send('x'); await sleep(400); await send('f 40'); WZ.alto = null; WZ.abort = false; await sleep(400); await goStart(); wzSay('Se detuvo: ' + msg + '. El punzón volvió a donde lo dejaste y el límite de fuerza quedó en 40 N.', 'er')} catch (_) {}
+  }
   finally {WZ.run = false; $('#wzStop').disabled = true; $('#wzRig').disabled = $('#wzDome').disabled = false}
 }
 $('#wzRig').onclick = () => wizard('rig'); $('#wzDome').onclick = () => wizard('dome'); $('#wzStop').onclick = () => {WZ.abort = true; send('x')};
