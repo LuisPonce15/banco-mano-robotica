@@ -77,5 +77,6 @@ Se puede probar el motor antes de conectar los HX711 y el FSR: sus fuerzas queda
 4. `e` habilita el motor · `h` busca el contacto con la silicona (z = 0).
 5. `r 3 0.5 2 3` corre 3 ciclos hasta 3 mm de profundidad a 0,5 mm/s con pausas de 2 s.
 6. **Grabar** antes del ensayo y **Guardar CSV** al terminar. La pestaña **Análisis** saca la curva del FSR.
+7. Para el **retardo del FSR** (cuánto se hunde la silicona antes de que el FSR responda) y la **rigidez de la silicona**: ensayo **Contacto y rigidez** (`r 8 0.05 2 3`). Ver [hardware/calibracion.md](hardware/calibracion.md#retardo-del-fsr-y-rigidez-de-la-silicona).
 
 Sin navegador compatible: `python3 analisis/registrar_serial.py /dev/cu.usbserial-0001 ensayo.csv` guarda los datos y `python3 analisis/analizar_ensayo.py ensayo.csv` hace el análisis.

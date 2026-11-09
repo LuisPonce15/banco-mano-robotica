@@ -65,10 +65,30 @@ El firmware deja de bajar cuando el FSR llega a `vl` (2500 mV por defecto) y emp
 2. Escalones finos hasta el límite del FSR: `p 0.05 99 3 0.2` (0,05 mm por escalón, pausa de 3 s, hasta 2500 mV).
 3. En el análisis, la fuerza mínima es la de las celdas en el primer escalón donde el voltaje del FSR supera la línea base más el umbral de ruido (lo que reporta `fsr_lectura`).
 
+### Retardo del FSR y rigidez de la silicona
+
+Con un solo ensayo se miden las dos cosas. La idea: las celdas notan el primer toque del punzón mucho antes que el FSR.
+
+- **h₁ (contacto):** la posición del punzón donde las celdas empiezan a subir. La página toma el ruido de las celdas mientras el punzón todavía está en el aire, busca dónde la fuerza pasa de la base + 6 σ, y afina el punto con la forma de Hertz al empezar el contacto (F^(2/3) crece lineal con z), así no depende del umbral.
+- **h₂ (el FSR responde):** donde el voltaje del FSR pasa de su base + máx(6 σ, 20 mV) durante 5 muestras seguidas.
+- **Retardo:** Δh = h₂ − h₁ en mm, en vueltas de la varilla (Δh / 1,25 mm), en tiempo (Δt) y la fuerza de las celdas en h₂ (la fuerza mínima que detecta el FSR en este montaje).
+- **Rigidez:** con la indentación d = z − h₁ − C·F se ajusta Hertz F = (4/3) · E/(1 − ν²) · √R · d^1,5 hasta d = 0,15 R. Sale el módulo E, la rigidez tangente dF/dd y la energía que disipa cada ciclo (área entre carga y descarga).
+
+Pasos:
+
+1. **Una sola vez, flexibilidad del montaje (C):** pon un bloque rígido (aluminio, acero) en lugar de la cúpula, `h`, y el ensayo **Contacto y rigidez** con 1 mm de profundidad y límite de fuerza bajo (`f 20`). En Análisis, **Usar este ensayo como montaje rígido**: C = pendiente de z contra F. Queda guardado para los siguientes análisis. Sin esto, la silicona parece más blanda de lo que es.
+2. Monta la cúpula, `t` (tara) y `h` (contacto).
+3. Ensayo **Contacto y rigidez**: `r 8 0.05 2 3` (baja a 0,05 mm/s desde 0,5 mm por encima del contacto, hasta 8 mm o hasta el límite del FSR, 3 ciclos). Lento para tener muchas muestras: a 10 SPS de las celdas, 0,05 mm/s da una lectura cada 0,005 mm.
+4. En **Análisis**: pon el radio R de la cúpula y ν (0,49 para silicona). La tarjeta **Contacto y respuesta del FSR** muestra h₁, h₂, Δh, vueltas, Δt, F al responder y E por ciclo; los indicadores de arriba dan la media ± desviación.
+5. **Llevar el retardo al modelo virtual** copia la media de Δh al parámetro «Retardo» del modelo (pestaña Modelo). En el modelo, hasta esa indentación el FSR no recibe fuerza y después recibe solo la que se suma desde ahí.
+
+La resolución en z es de 1,25 mm / 3200 micropasos = 0,0004 mm; lo que limita es la frecuencia de las celdas y la velocidad, por eso el ensayo es lento.
+
 ### Ensayos sugeridos
 
 | Ensayo | Comando | Para qué |
 |---|---|---|
+| Contacto y rigidez | `r 8 0.05 2 3` | Retardo del FSR (h₁ → h₂), fuerza mínima, módulo E de la silicona |
 | Ciclos lentos | `r 3 0.2 5 5` | Curva principal y repetibilidad |
 | Ciclos a varias velocidades | `r 3 0.1 2 3`, `r 3 0.5 2 3`, `r 3 2 2 3` | Efecto de la velocidad (viscoelasticidad) |
 | Escalones hasta el límite del FSR | `p 0.05 99 3 0.2` | Puntos estáticos, deriva en cada escalón e histéresis |
@@ -83,5 +103,7 @@ Ajusta la profundidad para quedarte por debajo del límite de fuerza (`f 40` por
 - **Histéresis:** máxima diferencia entre carga y descarga, en % del rango.
 - **Repetibilidad:** desviación entre ciclos a la misma fuerza.
 - **Deriva:** cambio de la lectura del FSR en el escalón sostenido (% por minuto).
+- **Retardo del FSR:** Δh = h₂ − h₁ (mm y vueltas) y la fuerza en h₂, media ± desviación de los ciclos.
+- **Rigidez de la silicona:** módulo E (Hertz), rigidez tangente y energía disipada por ciclo, con la flexibilidad del montaje C indicada.
 
-La pestaña **Análisis** de la página y `analisis/analizar_ensayo.py` calculan todo esto a partir del CSV.
+La pestaña **Análisis** de la página calcula todo esto a partir del CSV (`analisis/analizar_ensayo.py` calcula las curvas del sensor, sin el retardo ni la rigidez).

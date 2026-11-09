@@ -347,12 +347,21 @@ details.pre>summary h2{flex:1 1 auto}
         </div>
         <div class="grp">
           <h3>Ensayo automático</h3>
-          <div class="seg" id="testSeg"><button data-test="r" aria-pressed="true">Ciclos</button><button data-test="p">Escalones</button></div>
+          <div class="seg" id="testSeg"><button data-test="c">Contacto y rigidez</button><button data-test="r" aria-pressed="true">Ciclos</button><button data-test="p">Escalones</button></div>
           <div class="f2" id="testR">
             <div class="pf"><label for="rD">Profundidad (mm)</label><input id="rD" type="number" value="3" step="0.1"></div>
             <div class="pf"><label for="rV">Velocidad (mm/s)</label><input id="rV" type="number" value="0.5" step="0.1"></div>
             <div class="pf"><label for="rP">Pausa (s)</label><input id="rP" type="number" value="2" step="0.5"></div>
             <div class="pf"><label for="rN">Ciclos</label><input id="rN" type="number" value="3" step="1" min="1"></div>
+          </div>
+          <div id="testC" hidden style="display:flex;flex-direction:column;gap:6px">
+            <div class="f2">
+              <div class="pf"><label for="ctD">Profundidad máx. (mm)</label><input id="ctD" type="number" value="8" step="0.5"></div>
+              <div class="pf"><label for="ctV">Velocidad (mm/s)</label><input id="ctV" type="number" value="0.05" step="0.01"></div>
+              <div class="pf"><label for="ctP">Pausa (s)</label><input id="ctP" type="number" value="2" step="0.5"></div>
+              <div class="pf"><label for="ctN">Ciclos</label><input id="ctN" type="number" value="3" step="1" min="1"></div>
+            </div>
+            <p class="small muted">Baja muy lento desde 0,5 mm por encima del contacto, para que se vea el primer toque en las celdas y el momento en que responde el FSR. El límite del FSR lo detiene. Antes: <b>Buscar contacto (h)</b>. El resultado sale en <b>Análisis → Contacto y rigidez</b>.</p>
           </div>
           <div class="f2" id="testP" hidden>
             <div class="pf"><label for="pS">Paso (mm)</label><input id="pS" type="number" value="0.05" step="0.01"></div>
@@ -402,6 +411,17 @@ details.pre>summary h2{flex:1 1 auto}
         <div class="pf"><label for="aY">Eje vertical</label><select id="aY"><option value="V">Voltaje del FSR (mV)</option><option value="R">Resistencia del FSR (Ω, log)</option><option value="G">Conductancia 1/R (µS)</option></select></div>
         <div class="pf"><label for="aFmin">Fuerza mínima para el ajuste (N)</label><input id="aFmin" type="number" value="0.2" step="0.1"></div>
         <div class="pf"><label for="aCol">Colorear por</label><select id="aCol"><option value="fase">Carga / descarga</option><option value="ciclo">Ciclo</option></select></div>
+        <fieldset class="pg"><legend>Contacto y rigidez</legend>
+          <div class="f2">
+            <div class="pf"><label for="aR">Radio de la cúpula R (mm)</label><input id="aR" type="number" step="0.5"></div>
+            <div class="pf"><label for="aNu">Poisson ν</label><input id="aNu" type="number" value="0.49" step="0.01"></div>
+            <div class="pf"><label for="aDf">Hertz hasta d (mm)</label><input id="aDf" type="number" step="0.1"></div>
+            <div class="pf"><label for="aC">Flexibilidad del montaje C (mm/N)</label><input id="aC" type="number" value="0" step="0.001"></div>
+          </div>
+          <button class="btn sm" id="aRig">Usar este ensayo como montaje rígido</button>
+          <button class="btn sm" id="aDead">Llevar el retardo al modelo virtual</button>
+          <p class="small muted" id="aRigNote">C = 0: sin corrección. Mídela una vez con un bloque rígido en lugar de la cúpula.</p>
+        </fieldset>
         <div class="row"><button class="btn sm dl" id="aPng">Guardar gráfica (PNG)</button><button class="btn sm dl" id="aRes">Guardar resultados (CSV)</button></div>
       </div>
       <div class="main">
@@ -409,7 +429,16 @@ details.pre>summary h2{flex:1 1 auto}
         <div class="chart big"><h3 id="aTitle">Curva del FSR</h3><div class="lg" id="lgA"></div><canvas id="cA" aria-label="Curva del FSR contra fuerza con ajuste"></canvas></div>
         <div class="charts">
           <div class="chart"><h3>Fuerza y FSR en el tiempo</h3><div class="lg" id="lgAT"></div><canvas id="cAT" aria-label="Fuerza y FSR contra tiempo del ensayo"></canvas></div>
-          <div class="chart"><h3>Fuerza contra profundidad</h3><div class="lg" id="lgAD"></div><canvas id="cAD" aria-label="Fuerza contra profundidad: rigidez de la silicona"></canvas></div>
+          <div class="chart"><h3>Fuerza contra indentación (rigidez)</h3><div class="lg" id="lgAD"></div><canvas id="cAD" aria-label="Fuerza contra indentación con ajuste de Hertz"></canvas></div>
+        </div>
+        <div class="card" id="cContact">
+          <div class="card-head"><h2>Contacto y respuesta del FSR</h2><span class="small muted">h₁: primer toque en las celdas · h₂: el FSR responde</span></div>
+          <div class="charts">
+            <div class="chart" style="border:0;padding:0"><div class="lg" id="lgAC"></div><canvas id="cAC" aria-label="Fuerza y voltaje del FSR contra la posición del punzón alrededor del contacto"></canvas></div>
+            <div class="chart" style="border:0;padding:0"><div class="lg" id="lgAK"></div><canvas id="cAK" aria-label="Rigidez tangente contra indentación"></canvas></div>
+          </div>
+          <div class="tbl"><table><thead><tr><th>Ciclo</th><th>h₁ contacto (mm)</th><th>h₂ FSR (mm)</th><th>Δh (mm)</th><th>Vueltas</th><th>Δt (s)</th><th>F al responder (N)</th><th>E Hertz (kPa)</th><th>Energía disipada (mJ)</th></tr></thead><tbody id="contactTbl"></tbody></table></div>
+          <p class="small muted" id="contactNote"></p>
         </div>
         <div class="card small muted" id="aNotes"></div>
       </div>
@@ -589,7 +618,7 @@ const MATS = {
 const DEF = {
   lead: 1.25, micro: 16, eta: 0.3, Irun: 1.0, Irated: 1.7, Thold: 0.42, armW: 0.6, backlash: 0.05, kFrame: 80, gap0: 3,
   mat: 'ds20', E: 0.34, g1: 0.07, tau: 3, Rd: 20, hd: 18, rp: 8,
-  zF: 5, rAct: 6.35, R1: 10000, n: 0.9, Rsat: 200, Fon: 0.15, hyst: 0.12, creep: 0.03, conc: 1.3, var: 1.0,
+  zF: 5, dDead: 3, rAct: 6.35, R1: 10000, n: 0.9, Rsat: 200, Fon: 0.15, hyst: 0.12, creep: 0.03, conc: 1.3, var: 1.0,
   adcNoise: 6, hxRate: 10, share: 0.5, platN: 1.2, kErr1: 1.07, kErr2: 0.94
 };
 const P = Object.assign({}, DEF, store.get('fsrP', {}));
@@ -611,6 +640,7 @@ const PARAMS = [
     ['rp', 'Radio del punzón (mm)', 'num', 1, 30, 0.5]]],
   ['FSR402', [
     ['zF', 'Profundidad del FSR bajo la superficie (mm)', 'num', 0.5, 30, 0.5],
+    ['dDead', 'Retardo: indentación antes de que el FSR responda (mm)', 'num', 0, 15, 0.05],
     ['R1', 'R a 1 N (Ω)', 'num', 1000, 100000, 500],
     ['n', 'Exponente n', 'num', 0.4, 1.5, 0.05],
     ['Rsat', 'R de saturación (Ω)', 'num', 0, 2000, 10],
@@ -653,6 +683,9 @@ function silicone(d) {                           // fuerza elástica instantáne
                   : (4 / 3) * Es * Math.sqrt(Rr) * Math.pow(ds, 1.5) + 2 * Es * rp * (d - ds);
   return F * (1 + 3 * Math.pow(Math.min(d / P.hd, 0.95), 4));
 }
+// Retardo del FSR: la cúpula se hunde dDead mm antes de apoyarse en el sensor. Hasta ahí el FSR no recibe nada;
+// después recibe solo la fuerza que se suma desde ese punto: F·(1 − F(dDead)/F(d)).
+function fsrGate(d) {if (P.dDead <= 0) return 1; if (d <= P.dDead) return 0; const F0 = silicone(P.dDead), F1 = silicone(d); return F1 > 0 ? Math.max(0, 1 - F0 / F1) : 0}
 function fsrFraction(d) {
   const a = Math.min(Math.sqrt(P.Rd * Math.max(d, 0)), P.rp), zs = Math.max(0.5, P.zF * (1 - d / (2 * P.Rd)));
   const s2 = a * a / 3 + Math.pow(0.5 * zs, 2) + 0.01;
@@ -714,7 +747,7 @@ class VirtualBench {
     let F = (1 - P.g1) * Fe + this.q; if (F < 0 || d <= 0) {F = Math.max(0, F); if (d <= 0) F = 0}
     this.F = F;
     // FSR
-    const Fs = F * fsrFraction(d), fs = this.fs;
+    const Fs = F * fsrFraction(d) * fsrGate(d), fs = this.fs;
     if (Fs < P.Fon) {fs.peak = 0; fs.tLoad = 0; fs.unload = false}
     else {fs.tLoad += dt; if (Fs > fs.peak) {fs.peak = Fs; fs.unload = false} else if (Fs < fs.prev - 1e-4) fs.unload = true}
     fs.prev = Fs; this.Fs = Fs;
@@ -933,7 +966,7 @@ function startVirtual(autoplay) {
   if (autoplay) {
     const vb = SRC.vb;
     vb.pending.push({at: 2.0, fn: () => send('e')}, {at: 2.3, fn: () => send('h')});
-    const wait = () => {if (!SRC.vb || SRC.vb !== vb) return; if (vb.homed && vb.mode === 'IDLE') {send('r 3 0.8 1 30')} else vb.pending.push({at: vb.t + 0.3, fn: wait})};
+    const wait = () => {if (!SRC.vb || SRC.vb !== vb) return; if (vb.homed && vb.mode === 'IDLE') {send('r 8 0.8 1 30')} else vb.pending.push({at: vb.t + 0.3, fn: wait})};
     vb.pending.push({at: 2.6, fn: wait});
   }
 }
@@ -1049,6 +1082,8 @@ function plot(cv, o) {
   if (o.xLabel) {g.fillStyle = CSSV['--ink-2']; g.textAlign = 'right'; g.textBaseline = 'bottom'; g.fillText(o.xLabel, L + pw, h - 1)}
   if (o.yLabel) {g.save(); g.fillStyle = CSSV['--ink-2']; g.translate(11, T + ph / 2); g.rotate(-Math.PI / 2); g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(o.yLabel, 0, 0); g.restore()}
   // referencias horizontales
+  (o.vrefs || []).forEach(r => {const x = X(r.x); if (x < L || x > L + pw) return; g.save(); g.setLineDash([5, 4]); g.strokeStyle = r.color; g.beginPath(); g.moveTo(x, T); g.lineTo(x, T + ph); g.stroke(); g.restore();
+    g.fillStyle = r.color; const rt = r.right || x + g.measureText(r.label).width + 6 > L + pw; g.textAlign = rt ? 'right' : 'left'; g.textBaseline = 'top'; g.fillText(r.label, x + (rt ? -4 : 4), T + 4 + (r.dy || 0))});
   (o.refs || []).forEach(r => {const y = Y(r.y); if (y < T || y > T + ph) return; g.save(); g.setLineDash([5, 4]); g.strokeStyle = r.color; g.beginPath(); g.moveTo(L, y); g.lineTo(L + pw, y); g.stroke(); g.restore();
     g.fillStyle = r.color; g.textAlign = 'left'; g.textBaseline = 'bottom'; g.fillText(r.label, L + 4, y - 2)});
   g.save(); g.beginPath(); g.rect(L, T, pw, ph); g.clip();
@@ -1218,6 +1253,7 @@ const PRE = [
   ['Motor', 'Probar +0,05 y −0,05 a 0,05 mm/s: + baja y − sube'],
   ['Ensayo', 'Buscar contacto: z = 0 en el toque y queda 0,5 mm arriba', 'h'],
   ['Ensayo', 'Acondicionar el FSR: 5 ciclos sin grabar', 'r 3 1 0 5'],
+  ['Ensayo', 'Una sola vez (o si cambias el montaje): ensayo «Contacto y rigidez» con un bloque rígido en vez de la cúpula, y en Análisis «Usar como montaje rígido»'],
   ['Ensayo', 'Elegir el ensayo, marcar «Grabar automáticamente» e Iniciar ensayo'],
   ['Al terminar', 'Guardar CSV y Llevar a Análisis'],
   ['Al terminar', 'Soltar el motor, quitar los 12 V y después el USB', 'd']
@@ -1248,11 +1284,12 @@ $('#stopBtn').onclick = () => send('x');
 $$('[data-c]').forEach(b => b.onclick = () => send(b.dataset.c));
 $$('[data-jog]').forEach(b => b.onclick = () => send('m ' + b.dataset.jog));
 $('#vSet').onclick = () => send('v ' + (+$('#vMan').value || 1));
-$$('#testSeg button').forEach(b => b.onclick = () => {$$('#testSeg button').forEach(x => x.setAttribute('aria-pressed', x === b)); $('#testR').hidden = b.dataset.test !== 'r'; $('#testP').hidden = b.dataset.test !== 'p'; updTestCmd()});
-function testCmd() {const r = $('#testSeg [aria-pressed="true"]').dataset.test === 'r';
-  return r ? `r ${+$('#rD').value} ${+$('#rV').value} ${+$('#rP').value} ${Math.round(+$('#rN').value)}` : `p ${+$('#pS').value} ${Math.round(+$('#pN').value)} ${+$('#pP').value} ${+$('#pV').value}`}
+$$('#testSeg button').forEach(b => b.onclick = () => {$$('#testSeg button').forEach(x => x.setAttribute('aria-pressed', x === b)); $('#testR').hidden = b.dataset.test !== 'r'; $('#testP').hidden = b.dataset.test !== 'p'; $('#testC').hidden = b.dataset.test !== 'c'; updTestCmd()});
+function testCmd() {const t = $('#testSeg [aria-pressed="true"]').dataset.test;
+  if (t === 'c') return `r ${+$('#ctD').value} ${+$('#ctV').value} ${+$('#ctP').value} ${Math.round(+$('#ctN').value)}`;
+  return t === 'r' ? `r ${+$('#rD').value} ${+$('#rV').value} ${+$('#rP').value} ${Math.round(+$('#rN').value)}` : `p ${+$('#pS').value} ${Math.round(+$('#pN').value)} ${+$('#pP').value} ${+$('#pV').value}`}
 function updTestCmd() {$('#testCmd').textContent = 'Comando: ' + testCmd()}
-['rD', 'rV', 'rP', 'rN', 'pS', 'pN', 'pP', 'pV'].forEach(id => $('#' + id).addEventListener('input', updTestCmd)); updTestCmd();
+['rD', 'rV', 'rP', 'rN', 'pS', 'pN', 'pP', 'pV', 'ctD', 'ctV', 'ctP', 'ctN'].forEach(id => $('#' + id).addEventListener('input', updTestCmd)); updTestCmd();
 $('#testGo').onclick = () => {if ($('#autoRec').checked) {SRC.autoRecNext = true; SRC.stopRecOnFin = true} send(testCmd())};
 $('#fLim').onchange = () => send('f ' + (+$('#fLim').value || 40));
 $('#vLim').onchange = () => send('vl ' + (+$('#vLim').value || 2500));
@@ -1310,24 +1347,115 @@ function drift(rows) {   // cambio de V durante la pausa con carga más larga (%
   if (!best || best.length < 10) return NaN; const dt = best[best.length - 1].t - best[0].t; if (dt < 1) return NaN;
   const v0 = best.slice(0, 5).reduce((s, r) => s + r.V, 0) / 5, v1 = best.slice(-5).reduce((s, r) => s + r.V, 0) / 5; return 100 * (v1 - v0) / v0 / (dt / 60);
 }
+
+/* ---------- contacto, retardo del FSR y rigidez ---------- */
+const RIG = Object.assign({C: 0}, store.get('fsrRig', {}));
+function meanSd(a) {const n = a.length; if (!n) return [NaN, NaN]; const m = a.reduce((s, v) => s + v, 0) / n; return [m, n > 1 ? Math.sqrt(a.reduce((s, v) => s + (v - m) ** 2, 0) / (n - 1)) : 0]}
+function loadSegments(rows) {     // tramos contiguos de bajada (fase 1), con unas muestras previas
+  const segs = []; let cur = null;
+  rows.forEach((r, i) => {if (r.ph === 1) {if (!cur) cur = {i0: i, i1: i, cy: r.cy}; cur.i1 = i} else if (cur) {segs.push(cur); cur = null}});
+  if (cur) segs.push(cur);
+  return segs.filter(s => s.i1 - s.i0 > 20 && rows[s.i1].z - rows[s.i0].z > 0.1);
+}
+function contactCycle(rows, sg, o) {
+  const R_ = rows.slice(sg.i0, sg.i1 + 1), z0s = R_[0].z, span = R_[R_.length - 1].z - z0s;
+  const base = R_.filter(r => r.z <= z0s + Math.min(0.25, 0.4 * span)); if (base.length < 8) return null;
+  const [Fb, Fs] = meanSd(base.map(r => r.F)), [Vb, Vs] = meanSd(base.map(r => r.V));
+  const Fth = Fb + Math.max(6 * Fs, 0.01), Vth = Vb + Math.max(6 * Vs, 20);
+  const sustained = (i, key, th, n) => {for (let k = i; k < Math.min(R_.length, i + n); k++) if (R_[k][key] <= th) return false; return i + n <= R_.length};
+  let ic = -1; for (let i = base.length; i < R_.length; i++) if (R_[i].F > Fth && sustained(i, 'F', Fth, 8)) {ic = i; break}
+  if (ic < 0) return null;
+  // contacto extrapolado: en Hertz F^(2/3) crece lineal con z → se ajusta justo después del umbral
+  const win = R_.slice(ic, R_.length).filter(r => r.F - Fb > 0 && r.F - Fb < Math.max(10 * (Fth - Fb), 0.3) && r.z < R_[ic].z + 0.6);
+  let h1 = R_[ic].z, h1x = NaN;
+  if (win.length > 6) {const f = linfit(win.map(r => r.z), win.map(r => Math.pow(r.F - Fb, 2 / 3))); if (f.b > 0) {h1x = -f.a / f.b; if (h1x < h1 && h1x > h1 - 0.5) h1 = h1x}}
+  let iv = -1; for (let i = ic; i < R_.length; i++) if (R_[i].V > Vth && sustained(i, 'V', Vth, 5)) {iv = i; break}
+  // instante del contacto: la primera muestra con z ≥ h1
+  let it1 = ic; for (let i = 0; i <= ic; i++) if (R_[i].z >= h1) {it1 = i; break}
+  const out = {cy: sg.cy, h1, h1th: R_[ic].z, t1: R_[it1].t, Fb, Fs, Vb, Vs, Fth, Vth, seg: R_};
+  if (iv >= 0) Object.assign(out, {h2: R_[iv].z, t2: R_[iv].t, Fon: R_[iv].F - Fb, Von: R_[iv].V});
+  // indentación corregida y Hertz: F = A·d^1,5
+  const pts = R_.filter(r => r.z > h1).map(r => {const F = r.F - Fb; return {d: r.z - h1 - o.C * F, F}}).filter(p => p.d > 0);
+  const fit = pts.filter(p => p.d <= o.dFit);
+  if (fit.length > 8) {
+    let sxy = 0, sxx = 0; fit.forEach(p => {const x = Math.pow(p.d, 1.5); sxy += x * p.F; sxx += x * x}); const A = sxy / sxx;
+    const my = fit.reduce((s, p) => s + p.F, 0) / fit.length; let ss = 0, st = 0; fit.forEach(p => {ss += (p.F - A * Math.pow(p.d, 1.5)) ** 2; st += (p.F - my) ** 2});
+    const Es = 3 * A / (4 * Math.sqrt(o.R)); out.hz = {A, Es, E: Es * (1 - o.nu * o.nu), r2: 1 - ss / st};
+  }
+  out.pts = pts;
+  // energía: área bajo la carga menos área bajo la descarga del mismo ciclo (mm·N = mJ)
+  const unl = rows.filter(r => r.cy === sg.cy && r.ph === 3 && r.z > h1).map(r => {const F = r.F - Fb; return {d: r.z - h1 - o.C * F, F}}).sort((a, b) => a.d - b.d);
+  const area = P_ => {const q = P_.slice().sort((a, b) => a.d - b.d); let A = 0; for (let i = 1; i < q.length; i++) A += (q[i].d - q[i - 1].d) * (q[i].F + q[i - 1].F) / 2; return A};
+  if (unl.length > 5 && pts.length > 5) {const Wl = area(pts), Wu = area(unl); out.Wl = Wl; out.Wd = Wl - Wu}
+  return out;
+}
+function contactAnalysis(rows) {
+  const o = {R: +$('#aR').value || P.Rd, nu: +$('#aNu').value || 0.49, dFit: +$('#aDf').value || 0.15 * (+$('#aR').value || P.Rd), C: +$('#aC').value || 0};
+  const cyc = loadSegments(rows).map(sg => contactCycle(rows, sg, o)).filter(Boolean);
+  return {o, cyc};
+}
+function compliance(rows) {     // montaje rígido: z = z0 + C·F en la carga, por encima de 0,5 N
+  const pts = rows.filter(r => r.ph === 1 && r.F > 0.5); if (pts.length < 10) return null;
+  const f = linfit(pts.map(r => r.F), pts.map(r => r.z)); return {C: f.b, r2: f.r2, n: pts.length};
+}
+function drawContact(ca) {
+  const tb = $('#contactTbl'), note = $('#contactNote');
+  if (!ca.cyc.length) {tb.innerHTML = '<tr><td colspan="9" class="muted">No encontré tramos de bajada que empiecen antes del contacto. Usa el ensayo «Contacto y rigidez» después de «Buscar contacto (h)».</td></tr>';
+    note.textContent = ''; ['cAC', 'cAK'].forEach(id => {const c = canvasCtx($('#' + id)); if (c) {c.g.fillStyle = CSSV['--ink-2']; c.g.font = '13px Barlow,sans-serif'; c.g.textAlign = 'center'; c.g.fillText('Sin tramos de contacto', c.w / 2, c.h / 2)}}); return}
+  const lead = DH.status && +DH.status[13] ? +DH.status[13] : P.lead;
+  tb.innerHTML = ca.cyc.map(c => `<tr><td class="m">${c.cy}</td><td class="m">${fmt(c.h1, 3)}</td><td class="m">${c.h2 != null ? fmt(c.h2, 3) : '—'}</td><td class="m"><b>${c.h2 != null ? fmt(c.h2 - c.h1, 3) : '—'}</b></td><td class="m">${c.h2 != null ? fmt((c.h2 - c.h1) / lead, 2) : '—'}</td><td class="m">${c.h2 != null ? fmt(c.t2 - c.t1, 2) : '—'}</td><td class="m">${c.Fon != null ? fmt(c.Fon, 3) : '—'}</td><td class="m">${c.hz ? fmt(c.hz.E * 1000, 0) : '—'}</td><td class="m">${c.Wd != null ? fmt(c.Wd, 2) : '—'}</td></tr>`).join('');
+  const c = ca.cyc[0], R_ = c.seg, hi = (c.h2 != null ? c.h2 : c.h1) + 0.6, lo = c.h1 - 0.4;
+  const W = R_.filter(r => r.z >= lo && r.z <= hi), Fmx = Math.max(0.05, ...W.map(r => r.F - c.Fb)), sc = Fmx / 3300;
+  plot($('#cAC'), {xLo: lo, xHi: hi, yLo: Math.min(0, ...W.map(r => r.F - c.Fb)), yHi: Fmx * 1.1, xLabel: 'z del punzón (mm)', yLabel: 'N',
+    vrefs: [{x: c.h1, color: CSSV['--violet'], label: 'h₁ contacto'}].concat(c.h2 != null ? [{x: c.h2, color: CSSV['--accent'], label: 'h₂ FSR', dy: 14}] : []),
+    series: [{xs: W.map(r => r.z), ys: W.map(r => r.F - c.Fb), color: CSSV['--ink'], lw: 1.8}, {xs: W.map(r => r.z), ys: W.map(r => (r.V - c.Vb) * sc), color: CSSV['--accent'], lw: 1.4}]});
+  legend($('#lgAC'), [[CSSV['--ink'], 'F − base (N)'], [CSSV['--accent'], 'V FSR − base (escalado)'], [CSSV['--violet'], `ciclo ${c.cy}: Δh = ${c.h2 != null ? fmt(c.h2 - c.h1, 3) + ' mm' : '—'}`]]);
+  // rigidez tangente dF/dd (ajuste local)
+  const pts = c.pts.slice().sort((a, b) => a.d - b.d), kd = [], kv = [];
+  const wnd = Math.max(0.05, (pts.length ? pts[pts.length - 1].d : 1) / 25);
+  for (let i = 0; i < pts.length; i += Math.max(1, Math.floor(pts.length / 80))) {const q = pts.filter(p => Math.abs(p.d - pts[i].d) <= wnd); if (q.length > 4) {const f = linfit(q.map(p => p.d), q.map(p => p.F)); kd.push(pts[i].d); kv.push(f.b)}}
+  const hzK = kd.map(d => c.hz ? 1.5 * c.hz.A * Math.sqrt(d) : NaN);
+  plot($('#cAK'), {xLo: 0, xHi: Math.max(0.5, ...kd), yLo: 0, yHi: Math.max(1, ...kv.filter(Number.isFinite)) * 1.15, xLabel: 'indentación d (mm)', yLabel: 'N/mm',
+    vrefs: c.h2 != null ? [{x: c.h2 - c.h1, color: CSSV['--accent'], label: 'FSR responde'}] : [], series: [{xs: kd, ys: kv, color: CSSV['--ink'], lw: 1.8}, {xs: kd, ys: hzK, color: CSSV['--teal'], lw: 1.4, dash: [6, 4]}]});
+  legend($('#lgAK'), [[CSSV['--ink'], 'rigidez tangente dF/dd'], [CSSV['--teal'], 'Hertz']]);
+  note.innerHTML = `Umbrales del ciclo ${c.cy}: celdas ${fmt(c.Fth - c.Fb, 3)} N sobre la base (ruido ${fmt(c.Fs, 4)} N) · FSR ${fmt(c.Vth - c.Vb, 0)} mV sobre la base de ${fmt(c.Vb, 0)} mV. h₁ se extrapola con F^(2/3) ∝ (z − h₁), que es la forma de Hertz al empezar el contacto (por umbral: ${fmt(c.h1th, 3)} mm). Indentación corregida d = z − h₁ − C·F con C = ${fmt(ca.o.C, 4)} mm/N. Hertz con R = ${fmt(ca.o.R, 1)} mm y ν = ${fmt(ca.o.nu, 2)} hasta d = ${fmt(ca.o.dFit, 2)} mm.`;
+}
+$('#aR').value = P.Rd; $('#aDf').value = +(0.15 * P.Rd).toFixed(2); $('#aC').value = RIG.C;
+function updRigNote() {const C = +$('#aC').value || 0; $('#aRigNote').textContent = C ? `C = ${fmt(C, 4)} mm/N → rigidez del montaje ${fmt(1 / C, 0)} N/mm${RIG.from ? ' (de «' + RIG.from + '»)' : ''}.` : 'C = 0: sin corrección. Mídela una vez con un bloque rígido en lugar de la cúpula.'}
+['aR', 'aNu', 'aDf', 'aC'].forEach(id => $('#' + id).addEventListener('change', () => {if (id === 'aC') {RIG.C = +$('#aC').value || 0; RIG.from = ''; store.set('fsrRig', RIG)} updRigNote(); analyze()}));
+$('#aRig').onclick = () => {const d = DS[curDS]; if (!d) return; const c = compliance(d.rows);
+  if (!c || !(c.C > 0)) {toast('No pude medir la flexibilidad: necesito un tramo de carga con más de 0,5 N'); return}
+  RIG.C = c.C; RIG.from = d.name; store.set('fsrRig', RIG); $('#aC').value = +c.C.toFixed(5); updRigNote(); toast(`Montaje: C = ${fmt(c.C, 4)} mm/N (R² ${fmt(c.r2, 3)})`); analyze()};
+$('#aDead').onclick = () => {if (!AN || !AN.ca) return; const dz = AN.ca.cyc.filter(c => c.h2 != null).map(c => c.h2 - c.h1); if (!dz.length) {toast('Este ensayo no tiene el instante en que responde el FSR'); return}
+  const [m] = meanSd(dz); P.dDead = +m.toFixed(3); store.set('fsrP', P); buildParams(); drawModel(); toast(`Retardo del modelo virtual: ${fmt(m, 3)} mm`)};
+updRigNote();
 let AN = null;
 function analyze() {
   const d = DS[curDS];
   if (!d) {$('#kpis').innerHTML = ''; $('#aNotes').textContent = ''; ['cA', 'cAT', 'cAD'].forEach(id => {const c = canvasCtx($('#' + id)); if (c) {c.g.fillStyle = CSSV['--ink-2']; c.g.font = '13px Barlow,sans-serif'; c.g.textAlign = 'center'; c.g.fillText('Sin datos', c.w / 2, c.h / 2)}}); return}
-  const rows = d.rows, fmin = +$('#aFmin').value || 0.2, ok = rows.filter(r => r.F > fmin && Number.isFinite(r.R) && r.R > 0 && r.R < 4e6);
+  const rows = d.rows, fmin = +$('#aFmin').value || 0.2, ca = contactAnalysis(rows), vOn = ca.cyc.length ? Math.max(...ca.cyc.map(c => c.Vth)) : 0;
+  const ok = rows.filter(r => r.F > fmin && r.V > vOn && Number.isFinite(r.R) && r.R > 0 && r.R < 4e6);   // el ajuste del sensor solo usa lo que el FSR ya ve
   let pw = null, ln = null;
   if (ok.length > 10) {const f = linfit(ok.map(r => Math.log(r.F)), ok.map(r => Math.log(r.R))); pw = {A: Math.exp(f.a), n: -f.b, r2: f.r2};
     ln = linfit(ok.map(r => r.F), ok.map(r => 1e6 / r.R)); ln = {k: ln.b, g0: ln.a, r2: ln.r2}}
   const Fmax = Math.max(...rows.map(r => r.F)), hy = hysteresis(rows), rp = repeatability(rows), dr = drift(rows);
   const sens = ln ? ln.k : NaN;
-  AN = {name: d.name, pw, ln, Fmax, hy, rp, dr, n: rows.length, dur: rows[rows.length - 1].t - rows[0].t};
+  AN = {name: d.name, pw, ln, Fmax, hy, rp, dr, n: rows.length, dur: rows[rows.length - 1].t - rows[0].t, ca};
+  const dz = ca.cyc.filter(c => c.h2 != null).map(c => c.h2 - c.h1), fo = ca.cyc.filter(c => c.Fon != null).map(c => c.Fon), Ee = ca.cyc.filter(c => c.hz).map(c => c.hz.E * 1000), Wd = ca.cyc.filter(c => c.Wd != null).map(c => c.Wd), Wl = ca.cyc.filter(c => c.Wl != null).map(c => c.Wl);
+  const [dzm, dzs] = meanSd(dz), [fom, fos] = meanSd(fo), [Em, Esd] = meanSd(Ee), [Wdm] = meanSd(Wd), [Wlm] = meanSd(Wl);
+  const k1 = ca.cyc.filter(c => c.hz).map(c => 1.5 * c.hz.A); const [k1m] = meanSd(k1);
+  Object.assign(AN, {dzm, dzs, fom, fos, Em, Esd, k1m, Wdm, Wlm, nc: ca.cyc.length});
   $('#kpis').innerHTML = [
     ['Ajuste de potencia', pw ? `R = ${fmt(pw.A, 0)}·F^−${fmt(pw.n, 3)}` : '—', pw ? 'R² = ' + fmt(pw.r2, 4) : 'pocos puntos'],
     ['Conductancia lineal', ln ? `${fmt(ln.k, 2)} µS/N` : '—', ln ? `G₀ = ${fmt(ln.g0, 2)} µS · R² = ${fmt(ln.r2, 4)}` : ''],
     ['Histéresis', Number.isFinite(hy) ? fmt(hy, 1) + ' %' : '—', 'del rango de V, carga contra descarga'],
     ['Repetibilidad', Number.isFinite(rp) ? fmt(rp, 2) + ' %' : '—', 'desviación entre ciclos (carga)'],
     ['Deriva en la pausa', Number.isFinite(dr) ? fmt(dr, 2) + ' %/min' : '—', 'cambio de V con carga sostenida'],
-    ['Fuerza máxima', fmt(Fmax, 2) + ' N', `${rows.length} muestras · ${fmt(AN.dur, 1)} s`]
+    ['Fuerza máxima', fmt(Fmax, 2) + ' N', `${rows.length} muestras · ${fmt(AN.dur, 1)} s`],
+    ['Retardo del FSR Δh', Number.isFinite(dzm) ? fmt(dzm, 3) + ' mm' : '—', Number.isFinite(dzm) ? `± ${fmt(dzs, 3)} mm · ${dz.length} ciclos · ${fmt(dzm / (DH.status && +DH.status[13] ? +DH.status[13] : P.lead), 2)} vueltas` : 'usa el ensayo Contacto y rigidez'],
+    ['Fuerza mínima que detecta', Number.isFinite(fom) ? fmt(fom, 3) + ' N' : '—', Number.isFinite(fom) ? `± ${fmt(fos, 3)} N · ≈ ${fmt(fom / G * 1000, 0)} g` : ''],
+    ['Módulo E (Hertz)', Number.isFinite(Em) ? fmt(Em, 0) + ' kPa' : '—', Number.isFinite(Em) ? `± ${fmt(Esd, 0)} kPa · rigidez a 1 mm ≈ ${fmt(k1m, 2)} N/mm` : 'necesita tramos de carga desde antes del contacto'],
+    ['Energía disipada', Number.isFinite(Wdm) ? fmt(Wdm, 2) + ' mJ' : '—', Number.isFinite(Wdm) && Wlm > 0 ? `${fmt(100 * Wdm / Wlm, 0)} % de la energía de carga` : '']
   ].map(([k, v, s]) => `<div class="kpi">${k}<b>${v}</b><span>${s}</span></div>`).join('');
   const yk = $('#aY').value, colBy = $('#aCol').value;
   const ys = rows.map(r => yk === 'V' ? r.V : yk === 'R' ? r.R : 1e6 / r.R), xs = rows.map(r => r.F);
@@ -1348,16 +1476,29 @@ function analyze() {
   plot($('#cAT'), {xLo: 0, xHi: ts[ts.length - 1] || 1, yLo: 0, yHi: Math.max(Fmax * 1.1, 0.5), xLabel: 't (s)', yLabel: 'N',
     series: [{xs: ts, ys: rows.map(r => r.F), color: CSSV['--ink'], lw: 1.6}, {xs: ts, ys: rows.map(r => r.V * vScale), color: CSSV['--accent'], lw: 1.2}]});
   legend($('#lgAT'), [[CSSV['--ink'], 'F (N)'], [CSSV['--accent'], 'V FSR (escalado al eje)']]);
-  const zs = rows.map(r => r.z), [z0, z1] = range([zs], 0.05);
-  plot($('#cAD'), {xLo: z0, xHi: z1, yLo: 0, yHi: Math.max(Fmax * 1.1, 0.5), xLabel: 'z (mm)', yLabel: 'N', series: [{points: true, xs: zs, ys: rows.map(r => r.F), colors: rows.map(r => PHCOL(r.ph)), r: 1.4}]});
-  legend($('#lgAD'), [[CSSV['--accent'], 'cargando'], [CSSV['--teal'], 'descargando']]);
-  $('#aNotes').innerHTML = `<p><b>Cómo leerlo.</b> La curva de potencia R = A·F^−n es la forma típica de un FSR. La conductancia 1/R suele ser casi lineal con la fuerza en el rango útil: su pendiente es la sensibilidad. La histéresis compara la misma fuerza al cargar y al descargar. En la gráfica de fuerza contra profundidad, el área entre carga y descarga es la energía que disipa la silicona.</p>`;
+  if (ca.cyc.length) {
+    const c0 = ca.cyc[0], ind = rows.filter(r => r.cy === c0.cy && (r.ph === 1 || r.ph === 3) && r.z > c0.h1).map(r => {const F = r.F - c0.Fb; return {d: r.z - c0.h1 - ca.o.C * F, F, ph: r.ph}}).filter(p => p.d > 0);
+    const dmx = Math.max(0.5, ...ind.map(p => p.d)), hx = [], hy = []; for (let i = 0; i <= 80; i++) {const dd = dmx * i / 80; hx.push(dd); hy.push(c0.hz ? c0.hz.A * Math.pow(dd, 1.5) : NaN)}
+    plot($('#cAD'), {xLo: 0, xHi: dmx, yLo: 0, yHi: Math.max(0.5, ...ind.map(p => p.F)) * 1.1, xLabel: 'indentación d (mm)', yLabel: 'N',
+      vrefs: [{x: ca.o.dFit, color: CSSV['--ink-3'], label: 'límite del ajuste', right: true}].concat(c0.h2 != null ? [{x: c0.h2 - c0.h1, color: CSSV['--accent'], label: 'FSR responde', dy: 14}] : []),
+      series: [{points: true, xs: ind.map(p => p.d), ys: ind.map(p => p.F), colors: ind.map(p => PHCOL(p.ph)), r: 1.4}, {xs: hx, ys: hy, color: CSSV['--ink'], lw: 2, dash: [6, 4]}]});
+    legend($('#lgAD'), [[CSSV['--accent'], 'cargando'], [CSSV['--teal'], 'descargando'], [CSSV['--ink'], c0.hz ? `Hertz: E = ${fmt(c0.hz.E * 1000, 0)} kPa · R² ${fmt(c0.hz.r2, 3)}` : 'Hertz']]);
+  } else {
+    const zs = rows.map(r => r.z), [z0, z1] = range([zs], 0.05);
+    plot($('#cAD'), {xLo: z0, xHi: z1, yLo: 0, yHi: Math.max(Fmax * 1.1, 0.5), xLabel: 'z (mm)', yLabel: 'N', series: [{points: true, xs: zs, ys: rows.map(r => r.F), colors: rows.map(r => PHCOL(r.ph)), r: 1.4}]});
+    legend($('#lgAD'), [[CSSV['--accent'], 'cargando'], [CSSV['--teal'], 'descargando'], [CSSV['--ink-3'], 'sin contacto detectado: eje en z del firmware']]);
+  }
+  drawContact(ca);
+  $('#aNotes').innerHTML = `<p><b>Cómo leerlo.</b> La curva de potencia R = A·F^−n es la forma típica de un FSR. La conductancia 1/R suele ser casi lineal con la fuerza en el rango útil: su pendiente es la sensibilidad. La histéresis compara la misma fuerza al cargar y al descargar. En la gráfica de fuerza contra indentación, el área entre carga y descarga es la energía que disipa la silicona. <b>Retardo del FSR:</b> h₁ es donde las celdas notan el primer toque y h₂ donde el voltaje del FSR sube sobre su ruido; Δh = h₂ − h₁ es la indentación que necesita la cúpula para que el sensor responda, y la fuerza en h₂ es la fuerza mínima que detecta. <b>Rigidez:</b> E sale de ajustar F = (4/3)·E/(1 − ν²)·√R·d^1,5 a la carga; sin corregir la flexibilidad del montaje (C), la silicona parece más blanda.</p>`;
 }
 ['aY', 'aFmin', 'aCol'].forEach(id => $('#' + id).addEventListener('change', analyze));
 $('#aPng').onclick = () => {const c = $('#cA'); c.toBlob(b => b && saveBlob(b, `curva-fsr-${stamp()}.png`), 'image/png')};
 $('#aRes').onclick = () => {if (!AN) return; const a = AN;
   const rows = [['ensayo', a.name], ['muestras', a.n], ['duracion_s', a.dur.toFixed(2)], ['F_max_N', a.Fmax.toFixed(4)], ['potencia_A_ohm', a.pw ? a.pw.A.toFixed(2) : ''], ['potencia_n', a.pw ? a.pw.n.toFixed(4) : ''], ['potencia_R2', a.pw ? a.pw.r2.toFixed(5) : ''],
-    ['conductancia_k_uS_por_N', a.ln ? a.ln.k.toFixed(4) : ''], ['conductancia_G0_uS', a.ln ? a.ln.g0.toFixed(4) : ''], ['conductancia_R2', a.ln ? a.ln.r2.toFixed(5) : ''], ['histeresis_pct', Number.isFinite(a.hy) ? a.hy.toFixed(3) : ''], ['repetibilidad_pct', Number.isFinite(a.rp) ? a.rp.toFixed(3) : ''], ['deriva_pct_min', Number.isFinite(a.dr) ? a.dr.toFixed(3) : '']];
+    ['conductancia_k_uS_por_N', a.ln ? a.ln.k.toFixed(4) : ''], ['conductancia_G0_uS', a.ln ? a.ln.g0.toFixed(4) : ''], ['conductancia_R2', a.ln ? a.ln.r2.toFixed(5) : ''], ['histeresis_pct', Number.isFinite(a.hy) ? a.hy.toFixed(3) : ''], ['repetibilidad_pct', Number.isFinite(a.rp) ? a.rp.toFixed(3) : ''], ['deriva_pct_min', Number.isFinite(a.dr) ? a.dr.toFixed(3) : ''],
+    ['retardo_fsr_mm', Number.isFinite(a.dzm) ? a.dzm.toFixed(4) : ''], ['retardo_fsr_sd_mm', Number.isFinite(a.dzs) ? a.dzs.toFixed(4) : ''], ['fuerza_minima_N', Number.isFinite(a.fom) ? a.fom.toFixed(4) : ''],
+    ['E_hertz_kPa', Number.isFinite(a.Em) ? a.Em.toFixed(1) : ''], ['E_hertz_sd_kPa', Number.isFinite(a.Esd) ? a.Esd.toFixed(1) : ''], ['rigidez_1mm_N_por_mm', Number.isFinite(a.k1m) ? a.k1m.toFixed(3) : ''], ['energia_disipada_mJ', Number.isFinite(a.Wdm) ? a.Wdm.toFixed(3) : ''],
+    ['R_cupula_mm', a.ca.o.R], ['nu', a.ca.o.nu], ['C_montaje_mm_por_N', a.ca.o.C]].concat(a.ca.cyc.map(c => [`ciclo_${c.cy}_h1_h2_mm`, `${c.h1.toFixed(4)};${c.h2 != null ? c.h2.toFixed(4) : ''}`]));
   saveText('parametro,valor\n' + rows.map(r => r.join(',')).join('\n') + '\n', `resultados-fsr-${stamp()}.csv`)};
 
 /* ensayo de ejemplo: se corre el banco virtual sin dibujar */
@@ -1368,8 +1509,8 @@ function exampleDataset() {
     if (started && line.startsWith('D,')) {const p = line.split(','); const f1 = +p[3], f2 = +p[4], V = +p[5];
       rows.push({t: +p[1] / 1000, z: +p[2], f1, f2, F: f1 + f2, V, R: V > 1 ? meta.rm * (3300 - V) / V : Infinity, ph: +p[6], cy: +p[7]})}});
   let t = 0; vb.pending.push({at: 2, fn: () => vb.cmd('e')}, {at: 2.1, fn: () => vb.cmd('h')});
-  const go = () => {if (vb.homed && vb.mode === 'IDLE') vb.cmd('r 3 0.5 2 3'); else vb.pending.push({at: vb.t + 0.2, fn: go})}; vb.pending.push({at: 2.2, fn: go});
-  while (!fin && t < 120) {vb.tick(0.001); t += 0.001}
+  const go = () => {if (vb.homed && vb.mode === 'IDLE') vb.cmd('r 8 0.3 2 2'); else vb.pending.push({at: vb.t + 0.2, fn: go})}; vb.pending.push({at: 2.2, fn: go});
+  while (!fin && t < 150) {vb.tick(0.001); t += 0.001}
   return rows;
 }
 
@@ -1653,7 +1794,7 @@ function drawRm() {
   const f1 = Math.max(0.05, +$('#rmF1').value || 0.5), f2 = Math.max(f1 * 1.5, +$('#rmF2').value || 30);
   const RMS = [1000, 3300, 10000, 47000], cols = [CSSV['--violet'], CSSV['--teal'], CSSV['--accent'], CSSV['--warn']];
   const Fx = []; for (let i = 0; i <= 200; i++) Fx.push(f2 * 1.3 * i / 200);
-  const Rof = F => fsrR(F * fsrFraction(1.5));
+  const Rof = F => fsrR(F * fsrFraction(1.5));   // curva del sensor sin el retardo
   plot($('#cRm'), {xLo: 0, xHi: f2 * 1.3, yLo: 0, yHi: 3300, xLabel: 'F (N)', yLabel: 'mV', refs: [{y: 3100, color: CSSV['--warn'], label: 'saturación'}],
     series: RMS.map((rm, i) => ({xs: Fx, ys: Fx.map(F => 3300 * rm / (rm + Rof(F))), color: cols[i], lw: rm === DH.meta.rm ? 3 : 1.6}))});
   legend($('#lgRm'), RMS.map((rm, i) => [cols[i], fmt(rm / 1000, 1) + ' kΩ']));
@@ -1670,7 +1811,7 @@ function drawModel() {
   const ds = [], Fv = []; for (let i = 0; i <= 120; i++) {const d = 8 * i / 120; ds.push(d); Fv.push(silicone(d))}
   const Feq = Fv.map(F => F * (1 - P.g1));
   plot($('#cM1'), {xLo: 0, xHi: 8, yLo: 0, yHi: Math.max(...Fv) * 1.1 || 1, xLabel: 'profundidad d (mm)', yLabel: 'N', refs: [{y: 98.07, color: CSSV['--danger'], label: 'capacidad de una celda'}],
-    series: [{xs: ds, ys: Fv, color: CSSV['--ink'], lw: 2}, {xs: ds, ys: Feq, color: CSSV['--accent'], lw: 1.6, dash: [6, 4]}, {xs: ds, ys: ds.map(d => silicone(d) * fsrFraction(d)), color: CSSV['--teal'], lw: 1.6}]});
+    series: [{xs: ds, ys: Fv, color: CSSV['--ink'], lw: 2}, {xs: ds, ys: Feq, color: CSSV['--accent'], lw: 1.6, dash: [6, 4]}, {xs: ds, ys: ds.map(d => silicone(d) * fsrFraction(d) * fsrGate(d)), color: CSSV['--teal'], lw: 1.6}]});
   legend($('#lgM1'), [[CSSV['--ink'], 'F instantánea'], [CSSV['--accent'], 'F después de relajar'], [CSSV['--teal'], 'F que pasa por el FSR']]);
   const Fx = [], Rv = []; for (let i = 0; i <= 160; i++) {const F = 0.05 * Math.pow(10, 3 * i / 160); Fx.push(F); Rv.push(fsrR(F))}
   plot($('#cM2'), {xLo: 0, xHi: 20, yLo: 100, yHi: 6e6, logY: true, xLabel: 'F sobre el FSR (N)', yLabel: 'Ω', series: [{xs: Fx, ys: Rv, color: CSSV['--accent'], lw: 2}]});
@@ -1713,7 +1854,7 @@ let rz = 0; window.addEventListener('resize', () => {clearTimeout(rz); rz = setT
 const VIEW = R.initViewer({storeKey: 'fsrFile', defaultFile: 'fsr/firmware/fsr_ensayo/fsr_ensayo.ino', order: ['fsr/firmware', 'fsr/hardware', 'fsr/analisis', 'fsr', 'web', 'tools', '.github'], copyText, saveText});
 applyConf(); buildMontaje();
 document.addEventListener('click', e => {const a = e.target.closest('a[data-open]'); if (!a || a.closest('#cDoc')) return; e.preventDefault(); setTab('codigo'); VIEW.openFile(a.dataset.open)});
-addDataset('Ejemplo · banco virtual (Dragon Skin 20, Rm 10 kΩ)', exampleDataset());
+addDataset('Ejemplo · banco virtual (Dragon Skin 20, Rm 10 kΩ, contacto a 0,3 mm/s)', exampleDataset());
 renderDS();
 startVirtual(true);
 let initTab = 'ensayo'; try {const h = location.hash.slice(1); if (TABS.includes(h)) initTab = h; else {const s = localStorage.getItem('fsrTab'); if (TABS.includes(s)) initTab = s}} catch (e) {}
