@@ -475,6 +475,22 @@ details.pre>summary h2{flex:1 1 auto}
           <div class="small"><b>Δh según el umbral del FSR</b> (mediana de los ciclos usados; toca uno para usarlo):<div class="thrs" id="thrSens"></div></div>
           <p class="small muted" id="contactNote"></p>
         </div>
+        <div class="card" id="cThr">
+          <div class="card-head"><h2>h₁ y h₂ por umbrales fijos</h2><span class="small muted">en cada bajada: la primera fila que llega al valor que tú eliges</span></div>
+          <div class="f2" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
+            <div class="pf"><label for="tF">h₁: cambio de fuerza (N)</label><input id="tF" type="number" value="0.1" step="0.01" min="0.001"></div>
+            <div class="pf"><label for="tFt">± tolerancia (N)</label><input id="tFt" type="number" value="0.02" step="0.005" min="0"></div>
+            <div class="pf"><label for="tV">h₂: voltaje del FSR (mV)</label><input id="tV" type="number" value="400" step="10" min="1"></div>
+            <div class="pf"><label for="tVt">± tolerancia (mV)</label><input id="tVt" type="number" value="10" step="1" min="0"></div>
+            <div class="pf"><label for="tN">Lecturas seguidas (fuerza)</label><input id="tN" type="number" value="1" step="1" min="1"></div>
+            <div class="pf"><label for="tB">F base</label><select id="tB"><option value="move">con el motor ya bajando (0,4–0,7 s)</option><option value="start">en los primeros 0,3 s de la bajada</option></select></div>
+            <div class="pf"><label for="tL">Retraso de las celdas</label><select id="tL"><option value="raw">filas tal como vienen</option><option value="lag">corregir con el retraso de arriba</option></select></div>
+          </div>
+          <p class="small muted" id="thrHow"></p>
+          <div class="tbl"><table><thead><tr><th>Ciclo</th><th>F base (N)</th><th>h₁ z (mm)</th><th>ΔF en esa fila (N)</th><th>t₁ (s)</th><th>h₂ z (mm)</th><th>V en esa fila (mV)</th><th>t₂ (s)</th><th>Δh (mm)</th><th>Vueltas</th></tr></thead><tbody id="thrTbl"></tbody></table></div>
+          <p class="small" id="thrSum"></p>
+          <div class="row"><button class="btn sm dl" id="thrCsv">Guardar esta tabla (CSV)</button></div>
+        </div>
         <div class="card small muted" id="aNotes"></div>
       </div>
     </div>
@@ -1722,6 +1738,61 @@ $('#aDead').onclick = () => {if (!AN || !AN.ca) return;
   const dz = AN.ca.used.filter(c => c.h2 != null).map(c => c.h2 - c.h1); if (!dz.length) {toast('No hay ciclos usados con el instante en que responde el FSR'); return}
   const m = Math.max(0, median(dz)); P.dDead = +m.toFixed(3); store.set('fsrP', P); buildParams(); drawModel(); toast(`Retardo del modelo virtual: ${fmt(m, 3)} mm`)};
 updRigNote();
+
+/* ---------- h₁ y h₂ por umbrales fijos (método directo, fila por fila) ---------- */
+const TH = Object.assign({F: 0.1, Ft: 0.02, V: 400, Vt: 10, n: 1, B: 'move'}, store.get('fsrTh', {}));
+TH.L = TH.L || 'raw'; $('#tL').value = TH.L; $('#tL').addEventListener('change', () => {TH.L = $('#tL').value; store.set('fsrTh', TH); analyze()});
+$('#tB').value = TH.B; $('#tB').addEventListener('change', () => {TH.B = $('#tB').value; store.set('fsrTh', TH); analyze()});
+[['tF', 'F'], ['tFt', 'Ft'], ['tV', 'V'], ['tVt', 'Vt'], ['tN', 'n']].forEach(([id, k]) => {$('#' + id).value = TH[k];
+  $('#' + id).addEventListener('change', () => {TH[k] = Math.max(0, +$('#' + id).value || 0); if (k === 'n') TH.n = Math.max(1, Math.round(TH.n)); store.set('fsrTh', TH); analyze()})});
+function thresholdCycles(rows) {
+  const out = [], cys = [...new Set(rows.filter(r => r.ph === 1 && r.cy > 0).map(r => r.cy))];
+  for (const cy of cys) {
+    // la bajada de ese ciclo: desde la primera fila en fase 1 hasta antes de que empiece a subir (fase 3)
+    const i0 = rows.findIndex(r => r.cy === cy && r.ph === 1); if (i0 < 0) continue;
+    let i1 = i0; while (i1 + 1 < rows.length && rows[i1 + 1].cy === cy && rows[i1 + 1].ph !== 3) i1++;
+    const R_ = rows.slice(i0, i1 + 1), t0 = R_[0].t;
+    // base: con el motor quieto arriba las celdas marcan distinto que con el motor andando (~0,1–0,2 N),
+    // y el HX711 tarda ~0,3 s en mostrarlo; por defecto la base se toma con el motor ya en marcha
+    const bw = TH.B === 'start' ? [0, 0.3] : [0.4, 0.7], baseRows = R_.filter(r => r.t - t0 >= bw[0] && r.t - t0 <= bw[1]), Fb = median(baseRows.map(r => r.F));
+    const iStart = R_.findIndex(r => r.t - t0 > bw[1]);
+    // h₁: primera fila con ΔF ≥ objetivo − tolerancia, sostenida «n» lecturas nuevas de las celdas
+    let j1 = -1;
+    for (let i = Math.max(0, iStart); i < R_.length; i++) {
+      if (R_[i].F - Fb < TH.F - TH.Ft) continue;
+      let ok = true, seen = 1, last = R_[i].F;
+      for (let k = i + 1; k < R_.length && seen < TH.n; k++) {if (R_[k].F === last) continue; last = R_[k].F; seen++; if (R_[k].F - Fb < TH.F - TH.Ft) {ok = false; break}}
+      if (ok && seen >= TH.n) {j1 = i; break}
+    }
+    // h₂: primera fila con V ≥ objetivo − tolerancia
+    let j2 = -1; for (let i = 0; i < R_.length; i++) if (R_[i].V >= TH.V - TH.Vt) {j2 = i; break}
+    const c = {cy, Fb, n: R_.length};
+    if (j1 >= 0) Object.assign(c, {z1: R_[j1].z, t1: R_[j1].t, dF: R_[j1].F - Fb, in1: R_[j1].F - Fb <= TH.F + TH.Ft});
+    if (j2 >= 0) Object.assign(c, {z2: R_[j2].z, t2: R_[j2].t, V2: R_[j2].V, in2: R_[j2].V <= TH.V + TH.Vt});
+    if (j1 >= 0 && j2 >= 0) c.dh = c.z2 - c.z1;
+    out.push(c);
+  }
+  return out;
+}
+function drawThreshold(d) {
+  const lagS = Math.max(0, +$('#aLag').value || 0) / 1000, rowsLag = alignForce(d.rows, lagS);
+  const T = thresholdCycles(TH.L === 'lag' ? rowsLag : d.rows), T2 = thresholdCycles(TH.L === 'lag' ? d.rows : rowsLag), lead = DH.status && +DH.status[13] ? +DH.status[13] : P.lead, mark = ok => ok ? '' : ' <span style="color:var(--warn)" title="fuera de la tolerancia: el dato saltó por encima">⚠</span>';
+  AN.th = T;
+  $('#thrHow').innerHTML = `En cada bajada: <b>F base</b> = mediana de la fuerza ${TH.B === 'start' ? 'en los primeros 0,3 s' : 'entre 0,4 y 0,7 s después de empezar a bajar (con el motor ya en marcha; quieto arriba las celdas marcan ~0,1–0,2 N distinto)'}; h₁ se busca después de ese tramo. <b>h₁</b> = z de la primera fila con F − F base ≥ ${fmt(TH.F - TH.Ft, 3)} N (objetivo ${fmt(TH.F, 3)} ± ${fmt(TH.Ft, 3)} N)${TH.n > 1 ? `, y que siga así ${TH.n} lecturas nuevas de las celdas` : ''}. <b>h₂</b> = z de la primera fila con el FSR ≥ ${fmt(TH.V - TH.Vt, 0)} mV (objetivo ${fmt(TH.V, 0)} ± ${fmt(TH.Vt, 0)} mV). Δh = h₂ − h₁. ${TH.L === 'lag' ? `La fuerza va adelantada ${fmt(lagS * 1000, 0)} ms por el retraso del HX711 (cada fuerza queda en la fila donde realmente ocurrió).` : 'Son las filas tal como vienen en el CSV, sin corregir el retraso del HX711 (las celdas muestran cada fuerza ~0,2 s tarde).'} ⚠ = el dato saltó por encima de la tolerancia (no hubo una fila dentro del rango).`;
+  $('#thrTbl').innerHTML = T.length ? T.map(c => `<tr><td class="m">${c.cy}</td><td class="m">${fmt(c.Fb, 3)}</td><td class="m">${c.z1 != null ? fmt(c.z1, 4) : '—'}</td><td class="m">${c.z1 != null ? fmt(c.dF, 3) + mark(c.in1) : '—'}</td><td class="m">${c.t1 != null ? fmt(c.t1, 2) : '—'}</td><td class="m">${c.z2 != null ? fmt(c.z2, 4) : '—'}</td><td class="m">${c.z2 != null ? fmt(c.V2, 1) + mark(c.in2) : '—'}</td><td class="m">${c.t2 != null ? fmt(c.t2, 2) : '—'}</td><td class="m"><b>${c.dh != null ? fmt(c.dh, 4) : '—'}</b></td><td class="m">${c.dh != null ? fmt(c.dh / lead, 3) : '—'}</td></tr>`).join('')
+    : '<tr><td colspan="10" class="muted">No hay bajadas (fase 1) en este ensayo.</td></tr>';
+  const dh = T.filter(c => c.dh != null).map(c => c.dh);
+  if (dh.length) {const [m, sd] = meanSd(dh), noise = median(T.map(c => c.Fb)) ;
+    const neg = dh.filter(x => x < 0).length;
+    $('#thrSum').innerHTML = `<b>Δh = ${fmt(m, 4)} ± ${fmt(sd, 4)} mm</b> (media ± desviación de ${dh.length} ciclos; mediana ${fmt(median(dh), 4)} mm; ${fmt(m / lead, 3)} vueltas).` + (neg ? ` En ${neg} ciclo(s) Δh salió negativo: el FSR llegó a ${fmt(TH.V, 0)} mV antes de que las celdas vieran ${fmt(TH.F, 2)} N.` : '') +
+      (() => {const d2 = T2.filter(c => c.dh != null).map(c => c.dh); return d2.length ? ` ${TH.L === 'lag' ? 'Sin corregir' : `Corrigiendo el retraso (${fmt(lagS * 1000, 0)} ms)`}: Δh = ${fmt(meanSd(d2)[0], 4)} ± ${fmt(meanSd(d2)[1], 4)} mm.` : ''})();
+  } else $('#thrSum').textContent = 'No encontré h₁ y h₂ en la misma bajada con estos valores.';
+}
+$('#thrCsv').onclick = () => {if (!AN || !AN.th) return;
+  const head = 'ciclo,F_base_N,h1_z_mm,dF_h1_N,t1_s,h1_en_tolerancia,h2_z_mm,V_h2_mV,t2_s,h2_en_tolerancia,dh_mm,dh_vueltas';
+  const lead = DH.status && +DH.status[13] ? +DH.status[13] : P.lead, f = (v, n) => v == null ? '' : v.toFixed(n);
+  const L = AN.th.map(c => [c.cy, f(c.Fb, 4), f(c.z1, 4), f(c.dF, 4), f(c.t1, 3), c.z1 != null ? +c.in1 : '', f(c.z2, 4), f(c.V2, 1), f(c.t2, 3), c.z2 != null ? +c.in2 : '', f(c.dh, 4), c.dh != null ? (c.dh / lead).toFixed(4) : ''].join(','));
+  saveText([`# umbrales: dF=${TH.F}±${TH.Ft} N, V=${TH.V}±${TH.Vt} mV, lecturas seguidas=${TH.n}`, head].concat(L).join('\n'), `umbrales-h1-h2-${stamp()}.csv`)};
 let AN = null;
 function analyze() {
   const d = DS[curDS];
@@ -1788,7 +1859,7 @@ function analyze() {
     legend($('#lgAD'), [[CSSV['--accent'], 'cargando'], [CSSV['--teal'], 'descargando'], [CSSV['--ink-3'], 'sin contacto detectado: eje en z del firmware']]);
   }
   AN.sa = sa0;
-  drawContact(ca); drawSteps(sa0);
+  drawContact(ca); drawSteps(sa0); drawThreshold(d);
   if (!sa0 && ca.cyc.length) {const v = median(ca.cyc.map(c => c.v)), lagmm = v * Math.max(0, +$('#aLag').value || 0) / 1000;
     $('#contactNote').insertAdjacentHTML('afterbegin', `<span style="display:block;margin-bottom:6px;padding:6px 8px;border-left:3px solid var(--warn);background:var(--warn-bg);color:var(--ink)"><b>Este archivo es de ciclos continuos</b> (${ca.cyc.length} bajadas a ${fmt(v, 2)} mm/s), no de la medición guiada por escalones. Sirve para la curva del sensor y la repetibilidad, pero Δh y la fuerza al responder dependen del retraso del HX711 (aquí ≈ ${fmt(lagmm, 2)} mm). Para Δh usa <b>Ensayo → Contacto y rigidez → 2 · Cúpula</b>: ese ensayo baja una sola vez de a 0,05 mm, quieto 1 s en cada escalón.</span>`)}
   $('#aNotes').innerHTML = `<p><b>Cómo leerlo.</b> La curva de potencia R = A·F^−n es la forma típica de un FSR. La conductancia 1/R suele ser casi lineal con la fuerza en el rango útil: su pendiente es la sensibilidad. La histéresis compara la misma fuerza al cargar y al descargar. En la gráfica de fuerza contra indentación, el área entre carga y descarga es la energía que disipa la silicona. <b>Retardo del FSR:</b> h₁ es donde las celdas notan el primer toque y h₂ donde el voltaje del FSR sube sobre su ruido; Δh = h₂ − h₁ es la indentación que necesita la cúpula para que el sensor responda, y la fuerza en h₂ es la fuerza mínima que detecta. <b>Rigidez:</b> E sale de ajustar F = (4/3)·E/(1 − ν²)·√R·d^1,5 a la carga; sin corregir la flexibilidad del montaje (C), la silicona parece más blanda.</p>`;

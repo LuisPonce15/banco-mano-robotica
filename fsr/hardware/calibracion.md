@@ -100,6 +100,8 @@ En **Análisis**: pon el radio R de la cúpula y ν (0,49 para silicona). La tar
 
 La resolución en z es de 1,25 mm / 3200 micropasos = 0,0004 mm; lo que limita es la frecuencia de las celdas y la velocidad, por eso el ensayo es lento.
 
+**h₁ y h₂ por umbrales fijos** (tarjeta en Análisis, para cualquier ensayo con bajadas): en cada bajada, h₁ es la primera fila donde la fuerza sube un valor elegido (0,1 N ± 0,02 N por defecto) sobre la base de esa bajada, y h₂ la primera fila donde el FSR llega a un voltaje elegido (400 mV ± 10 mV). La base se toma por defecto con el motor ya bajando (0,4–0,7 s después de arrancar), porque con el motor quieto arriba las celdas marcan ~0,1–0,2 N distinto y, con la base tomada quieto, el arranque del motor ya pasa el umbral. Se puede usar las filas tal como vienen o corregir el retraso del HX711; la tabla se guarda en CSV.
+
 ### Ensayos sugeridos
 
 | Ensayo | Comando | Para qué |
