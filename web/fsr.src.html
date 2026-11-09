@@ -356,8 +356,9 @@ fieldset.pg legend{font-family:var(--mono);font-size:11px;letter-spacing:.06em;t
         </div>
         <div class="grp">
           <h3>Calibrar celdas</h3>
-          <div class="row"><input class="inp" id="calG" type="number" value="500" step="50" style="width:90px"><span class="small muted">g encima</span><button class="btn sm" id="cal1">Celda 1 (c1)</button><button class="btn sm" id="cal2">Celda 2 (c2)</button></div>
-          <p class="small muted">Primero la tara sin carga, después la masa conocida. En el banco virtual la masa se pone sola sobre la celda elegida.</p>
+          <div class="row"><input class="inp" id="calG" type="number" value="500" step="50" style="width:90px"><span class="small muted">g encima</span><button class="btn sm pri" id="calS">Las dos juntas (cs)</button></div>
+          <div class="row"><button class="btn sm" id="cal1">Solo celda 1 (c1)</button><button class="btn sm" id="cal2">Solo celda 2 (c2)</button></div>
+          <p class="small muted">Con las dos celdas bajo la plataforma usa <b>las dos juntas</b>: tara sin carga, pon la masa justo donde presiona el punzón (sobre la cúpula) y calibra. Corrige también el signo. «Solo celda» es para calibrarlas sueltas, sin la plataforma.</p>
         </div>
         <div class="grp">
           <h3>Lecturas</h3>
@@ -715,7 +716,7 @@ class VirtualBench {
     this.help(); this.say('Haciendo tara inicial (deja la plataforma sin contacto)...');
     this.pending.push({at: 1.7, fn: () => {this.tare(); this.status()}});
   }
-  help() {['?  ayuda            s  estado', 'e / d               motor con fuerza / suelto', 't                   tara de las celdas (sin contacto)', 'c1 500 / c2 500     calibrar celda 1 / 2 con 500 g encima', 'v 1                 velocidad manual (mm/s)', 'm 2.5               mover 2,5 mm (+ baja, - sube)', 'z                   esta posición es z = 0', 'h                   buscar el contacto con la silicona', 'r 3 0.5 2 3         ciclos: prof. mm, mm/s, pausa s, ciclos', 'p 0.5 6 5 0.5       escalones: paso mm, n, pausa s, mm/s', 'f 40                límite de fuerza (N)', 'vl 2500             límite del FSR (mV)', 'o 50                datos por segundo (0 = apagado)', 'rm 10000            resistencia del divisor del FSR', 'modo suma | modo punzon', 'x                   detener'].forEach(l => this.say(l))}
+  help() {['?  ayuda            s  estado', 'e / d               motor con fuerza / suelto', 't                   tara de las celdas (sin contacto)', 'c1 500 / c2 500     calibrar celda 1 / 2 con 500 g encima', 'cs 500              calibrar las dos juntas (masa donde presiona el punzón)', 'v 1                 velocidad manual (mm/s)', 'm 2.5               mover 2,5 mm (+ baja, - sube)', 'z                   esta posición es z = 0', 'h                   buscar el contacto con la silicona', 'r 3 0.5 2 3         ciclos: prof. mm, mm/s, pausa s, ciclos', 'p 0.5 6 5 0.5       escalones: paso mm, n, pausa s, mm/s', 'f 40                límite de fuerza (N)', 'vl 2500             límite del FSR (mV)', 'o 50                datos por segundo (0 = apagado)', 'rm 10000            resistencia del divisor del FSR', 'modo suma | modo punzon', 'x                   detener'].forEach(l => this.say(l))}
   tare() {this.hx.forEach(h => h.offset = h.raw); this.say('Tara lista. Celda 1: ok · Celda 2: ok')}
   status() {
     const m = {IDLE: 'quieto', MANUAL: 'moviendo', SEEK: 'buscando_contacto', TEST: 'ensayo'}[this.mode];
@@ -744,6 +745,7 @@ class VirtualBench {
       case 'x': this.stopAll('Detenido.'); break;
       case 't': if (this.mode !== 'IDLE') this.say('Detén el movimiento antes de la tara.'); else this.pending.push({at: this.t + 1.6, fn: () => this.tare()}); break;
       case 'c1': case 'c2': this.calibrate(c === 'c1' ? 0 : 1, A(0)); break;
+      case 'cs': this.calibrateSum(A(0)); break;
       case 'v': this.vManual = clamp(A(0), 0.01, 10); this.say(`Velocidad manual: ${this.vManual.toFixed(2)} mm/s`); break;
       case 'z': if (this.mode !== 'IDLE') this.say('Detén primero.'); else {this.zOff += this.zNow(); this.mot.pos = 0; this.mot.target = 0; this.homed = true; this.say('z = 0 aquí.')} break;
       case 'm': {
@@ -779,6 +781,18 @@ class VirtualBench {
       if (Math.abs(d) < 500) this.say('Casi no veo carga. ¿Pusiste la masa? ¿Hiciste la tara sin ella?');
       else {h.k = d / (g / 1000 * G); this.say(`Celda ${i + 1} calibrada: ${h.k.toFixed(1)} cuentas/N (guardado).`)}
       this.calMass[i] = 0; this.say(`(banco virtual) Quité la masa de la celda ${i + 1}.`);
+    }});
+  }
+  calibrateSum(g) {
+    if (g <= 0) {this.say('Escribe la masa en gramos, por ejemplo: cs 500'); return}
+    this.calMass = [g * (1 - P.share), g * P.share]; this.say(`(banco virtual) Puse ${g} g sobre la cúpula, donde presiona el punzón.`);
+    this.pending.push({at: this.t + 2.4, fn: () => {
+      const d1 = this.hx[0].raw - this.hx[0].offset, d2 = this.hx[1].raw - this.hx[1].offset;
+      if (Math.abs(d1) + Math.abs(d2) < 500) this.say('Casi no veo carga. ¿Pusiste la masa? ¿Hiciste la tara sin ella?');
+      else {const f1 = d1 / this.hx[0].k, f2 = d2 / this.hx[1].k, sc = (f1 + f2) / (g / 1000 * G); this.hx[0].k *= sc; this.hx[1].k *= sc;
+        const sh = Math.abs(f2) / (Math.abs(f1) + Math.abs(f2)) * 100;
+        this.say(`Suma calibrada (guardado): k1 = ${this.hx[0].k.toFixed(1)} · k2 = ${this.hx[1].k.toFixed(1)} cuentas/N. Reparto: celda 1 ${(100 - sh).toFixed(0)} % · celda 2 ${sh.toFixed(0)} %.`)}
+      this.calMass = [0, 0]; this.say('(banco virtual) Quité la masa.');
     }});
   }
   cycles(depth, v, pause, n) {
@@ -1185,6 +1199,7 @@ $('#modoSel').onchange = () => send('modo ' + $('#modoSel').value);
 $('#hzSel').onchange = () => send('o ' + $('#hzSel').value);
 $('#cal1').onclick = () => send('c1 ' + (+$('#calG').value || 500));
 $('#cal2').onclick = () => send('c2 ' + (+$('#calG').value || 500));
+$('#calS').onclick = () => send('cs ' + (+$('#calG').value || 500));
 const hist = []; let hi = 0;
 $('#cmdSend').onclick = () => {const v = $('#cmdIn').value.trim(); if (!v) return; send(v); hist.push(v); hi = hist.length; $('#cmdIn').value = ''};
 $('#cmdIn').addEventListener('keydown', e => {if (e.key === 'Enter') {e.preventDefault(); $('#cmdSend').click()}

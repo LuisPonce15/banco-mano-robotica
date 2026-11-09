@@ -8,7 +8,15 @@ El firmware trae un factor teórico (≈ 21 900 cuentas por newton para una celd
 2. Pon una masa conocida, idealmente 500 g o 1 kg, pesada en una balanza: `c1 500` (en gramos).
 3. Repite con la celda 2: `t`, masa, `c2 500`.
 
-**Modo suma:** calibra cada celda **antes** de montar la plataforma, con la masa sobre el extremo libre de esa celda. Después de montar la plataforma, verifica: pon la misma masa en el centro, en un borde y en el otro. F debe dar lo mismo (±1 %).
+**Con la plataforma montada sobre las dos celdas (modo suma):** usa `cs`, que calibra las dos juntas.
+
+1. Sin nada encima: `t`.
+2. Pon la masa **justo donde presiona el punzón** (sobre la cúpula o una placa pequeña en ese punto): `cs 500`.
+3. El firmware escala los dos factores para que F1 + F2 = masa · g, corrige el signo y dice cómo se reparte la carga entre las dos celdas. Es exacta para ese punto, que es donde siempre se mide.
+
+El signo depende de qué extremo de cada barra queda fijo: si al presionar la fuerza sale negativa, la calibración lo corrige y no hace falta cambiar hilos.
+
+**Alternativa:** calibra cada celda **antes** de montar la plataforma, con la masa sobre el extremo libre de esa celda. Después de montar la plataforma, verifica: pon la misma masa en el centro, en un borde y en el otro. F debe dar lo mismo (±1 %).
 
 **Verificación de linealidad:** con 100 g, 200 g, 500 g y 1 kg, anota F. El error debe quedar por debajo de 0,5 % del valor.
 

@@ -17,6 +17,7 @@
 //    e / d              motor con fuerza / suelto
 //    t                  tara de las dos celdas (sin el punzón tocando)
 //    c1 500 / c2 500    calibrar la celda 1 o 2 con una masa conocida (g)
+//    cs 500             calibrar las dos juntas (modo suma): masa donde presiona el punzón
 //    v 1                velocidad de los movimientos manuales (mm/s)
 //    m 2.5              mover (mm). + baja hacia la muestra, − sube
 //    z                  definir la posición actual como z = 0
@@ -193,6 +194,30 @@ void calibrate(int n, float grams) {
       + (h.k < 0 ? " El signo es negativo: la celda está al revés, pero ya queda corregido." : ""));
 }
 
+// Las dos celdas sostienen la plataforma: con la masa en el punto donde presiona
+// el punzón, se escalan los dos factores para que F1 + F2 = masa · g. Corrige
+// también el signo. Es exacta para ese punto, que es donde siempre se mide.
+void calibrateSum(float grams) {
+  if (grams <= 0) { say("Escribe la masa en gramos, por ejemplo: cs 500"); return; }
+  double a1, a2;
+  bool ok1 = average(hx1, 24, a1), ok2 = average(hx2, 24, a2);
+  if (!ok1 || !ok2) { say("Una de las celdas no responde: revisa los HX711."); return; }
+  double d1 = a1 - hx1.offset, d2 = a2 - hx2.offset;
+  if (fabs(d1) + fabs(d2) < 500) { say("Casi no veo carga. ¿Pusiste la masa? ¿Hiciste la tara sin ella?"); return; }
+  double f1 = d1 / hx1.k, f2 = d2 / hx2.k, W = grams / 1000.0 * G;
+  if (f1 * f2 < 0 && fmin(fabs(f1), fabs(f2)) > 0.1 * (fabs(f1) + fabs(f2))) {
+    say("Las dos celdas cambian en sentidos opuestos: calibra cada una sola con c1 y c2 (sin la plataforma) o invierte los hilos A+/A− de una.");
+    return;
+  }
+  double sc = (f1 + f2) / W;
+  hx1.k *= sc; hx2.k *= sc;
+  prefs.putFloat("k1", hx1.k); prefs.putFloat("k2", hx2.k);
+  double sh = fabs(f2) / (fabs(f1) + fabs(f2)) * 100;
+  say(String("Suma calibrada (guardado): k1 = ") + String(hx1.k, 1) + " · k2 = " + String(hx2.k, 1) + " cuentas/N. Reparto: celda 1 "
+      + String(100 - sh, 0) + " % · celda 2 " + String(sh, 0) + " %." + (sc < 0 ? " El signo estaba invertido: ya queda corregido." : ""));
+  if (!sumMode) say("Ojo: estás en modo punzón (F = F1). Para dos celdas bajo la plataforma usa: modo suma");
+}
+
 // ---------------- Programa de ensayo ----------------
 void addMove(float z, float v, uint8_t ph, uint16_t c) { if (nSeg < MAXSEG) prog[nSeg++] = {false, z, v, 0, ph, c}; }
 void addHold(float s, uint8_t ph, uint16_t c)          { if (nSeg < MAXSEG) prog[nSeg++] = {true, 0, 0, s, ph, c}; }
@@ -307,6 +332,7 @@ void help() {
     "e / d               motor con fuerza / suelto",
     "t                   tara de las celdas (sin contacto)",
     "c1 500 / c2 500     calibrar celda 1 / 2 con 500 g encima",
+    "cs 500              calibrar las dos juntas (masa donde presiona el punzón)",
     "v 1                 velocidad manual (mm/s)",
     "m 2.5               mover 2,5 mm (+ baja, - sube)",
     "z                   esta posición es z = 0",
@@ -342,6 +368,7 @@ void handle(String line) {
   else if (cmd == "x") { stopAll("Detenido."); }
   else if (cmd == "t") { if (mode != IDLE) say("Detén el movimiento antes de la tara."); else tare(); }
   else if (cmd == "c1" || cmd == "c2") calibrate(cmd == "c1" ? 1 : 2, a[0]);
+  else if (cmd == "cs") calibrateSum(a[0]);
   else if (cmd == "v") { vManual = constrain(a[0], 0.01f, 10.0f); say(String("Velocidad manual: ") + String(vManual, 2) + " mm/s"); }
   else if (cmd == "z") { if (mode != IDLE) say("Detén primero."); else { st->setCurrentPosition(0); homed = true; say("z = 0 aquí."); } }
   else if (cmd == "m") {
