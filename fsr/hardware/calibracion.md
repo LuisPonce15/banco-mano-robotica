@@ -70,7 +70,7 @@ El firmware deja de bajar cuando el FSR llega a `vl` (2500 mV por defecto) y emp
 Con un solo ensayo se miden las dos cosas. La idea: las celdas notan el primer toque del punzón mucho antes que el FSR.
 
 - **h₁ (contacto):** la posición del punzón donde las celdas empiezan a subir. La página toma el ruido de las celdas mientras el punzón todavía está en el aire, busca dónde la fuerza pasa de la base + 6 σ, y afina el punto con la forma de Hertz al empezar el contacto (F^(2/3) crece lineal con z), así no depende del umbral.
-- **h₂ (el FSR responde):** donde el voltaje del FSR pasa de su base + máx(6 σ, 20 mV) durante 5 muestras seguidas.
+- **h₂ (el FSR responde):** donde el voltaje del FSR sube **ΔV** por encima de su voltaje en reposo (medido antes del contacto) y se mantiene así durante N muestras seguidas. ΔV y N se eligen en Análisis (por defecto 50 mV y 5 muestras); la fila «Δh según el umbral» muestra cómo cambia Δh con ΔV de 10 a 1500 mV para escoger el que corresponde a «el FSR ya tiene información». El umbral elegido queda en el CSV de resultados.
 - **Retardo:** Δh = h₂ − h₁ en mm, en vueltas de la varilla (Δh / 1,25 mm), en tiempo (Δt) y la fuerza de las celdas en h₂ (la fuerza mínima que detecta el FSR en este montaje).
 - **Rigidez:** con la indentación d = z − h₁ − C·F se ajusta Hertz F = (4/3) · E/(1 − ν²) · √R · d^1,5 hasta d = 0,15 R. Sale el módulo E, la rigidez tangente dF/dd y la energía que disipa cada ciclo (área entre carga y descarga).
 
