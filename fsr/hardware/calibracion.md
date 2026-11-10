@@ -83,10 +83,12 @@ Pasos:
 
 La pestaña **Ensayo → Contacto y rigidez** tiene una **medición guiada** con dos botones que mandan cada comando, esperan a que el motor termine, ponen límites de fuerza bajos para que el motor no se fuerce y al final actualizan los parámetros:
 
-Antes de cada botón deja el punzón **bien arriba** (≈ 1 cm sobre la muestra, con espacio para cambiarla): el asistente arranca ahí, **no usa `h`** (baja de a poco y lee con el motor quieto, así encuentra el primer toque sin pasarse ni confundirse con el ruido) y al terminar, o si algo falla, **vuelve a esa altura**.
+Antes de cada botón deja el punzón arriba de la muestra (hasta 4 cm; mejor ≈ 1 cm, con espacio para cambiarla). Al terminar, o si algo falla, el asistente **vuelve a esa altura**. Para acercarse: `h` baja a 0,5 mm/s hasta el primer toque; después se aleja 1–2 mm y vuelve a bajar de a poco con el motor quieto (pasos de 0,05 o 0,1 mm, leyendo ya asentado) para ubicar el toque sin pasarse; se aleja otra vez y, desde el aire, corre los escalones.
 
-1. **Montaje rígido** (una sola vez, o si cambias el montaje): bloque rígido en vez de la cúpula. `t`, `e`, `z`, `f 10`; baja de a 0,05 mm hasta que las celdas pasen 0,15 N; sube 0,5 mm, `z` y `p 0.01 99 1 0.1` (cuando la fuerza pasa 10 N el firmware para y sube 1 mm); `f 40` y vuelve arriba. Calcula **C** con los escalones (z asentada contra F asentada entre 1 N y el 90 % del máximo). Sin el límite de 10 N, con un bloque rígido el FSR nunca llega a `vl` y el motor empuja hasta saltar pasos.
-2. **Cúpula**: `t`, `e`, `z`, `vl 2000`, `f 22`; baja de a 0,1 mm hasta el primer toque (celdas > 0,15 N o FSR +30 mV); sube 3,5 mm, `z` y `p 0.05 99 1 0.2` (~4 min). Como empieza 3,5 mm en el aire, h₁ y h₂ siempre quedan dentro del ensayo. En cada escalón la página promedia la fuerza y el FSR después de 0,45 s quieto, así el retraso del HX711 (~0,2 s) no afecta y Δh sale con ± 0,05 mm. Al final `f 40`, vuelve arriba, calcula h₁, h₂ y Δh y lleva Δh al modelo virtual. Pide que el punzón empiece por lo menos 5 mm arriba de la cúpula.
+> Requiere MS1, MS2 y MS3 a 3,3 V (1/16 de paso). Con esos pines sueltos el A4988 da paso completo y el punzón se mueve 16 veces lo que dice z. Comprobación: `m 1.25` debe girar la varilla exactamente una vuelta.
+
+1. **Montaje rígido** (una sola vez, o si cambias el montaje): bloque rígido en vez de la cúpula. `f 10`, acercamiento, `z` a 0,5 mm del bloque y `p 0.01 99 1 0.1` (cuando la fuerza pasa 10 N el firmware para y sube 1 mm); `f 40` y vuelve arriba. Calcula **C** con los escalones (z asentada contra F asentada entre 1 N y el 90 % del máximo).
+2. **Cúpula**: `f 22`, `vl 2000`, acercamiento, `z` a 3,5 mm del toque y `p 0.05 99 1 0.2` (~4 min). Como empieza en el aire, h₁ y h₂ siempre quedan dentro del ensayo. En cada escalón la página promedia la fuerza y el FSR después de 0,45 s quieto, así el retraso del HX711 (~0,2 s) no afecta y Δh sale con ± 0,05 mm. Al final `f 40`, vuelve arriba, calcula h₁, h₂ y Δh y lleva Δh al modelo virtual.
 
 A mano es lo mismo con los campos del ensayo e **Iniciar ensayo**. Por qué así:
 
